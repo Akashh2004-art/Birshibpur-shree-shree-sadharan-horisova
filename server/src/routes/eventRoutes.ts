@@ -8,7 +8,8 @@ import {
   updateEvent,
   deleteEvent,
   getUpcomingEvents,
-  getPastEvents 
+  getPastEvents,
+  getEventCount
 } from '../controllers/eventController';
 
 const router = express.Router();
@@ -50,6 +51,8 @@ router.delete('/:id', deleteEvent);
 router.get('/upcoming', getUpcomingEvents);
 
 router.get('/history', getPastEvents); // 👈 New route
+
+router.get('/count', getEventCount);
 
 
 export default router;

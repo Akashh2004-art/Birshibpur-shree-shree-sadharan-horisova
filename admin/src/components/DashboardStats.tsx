@@ -33,35 +33,41 @@ const DashboardStats: React.FC = () => {
   useEffect(() => {
     const fetchDashboardStats = async () => {
       try {
-        const response = await axios.get('/dashboard/stats');
+        // ১) মূল dashboard stats (users, bookings, donations)
+        const dashRes = await axios.get('/dashboard/stats');
+        // ২) এখন আলাদাভাবে event count
+        const eventRes = await axios.get('/events/count');
 
-        if (response.data.success) {
+        if (dashRes.data.success && eventRes.data.success) {
           setStats([
             { 
               title: 'Total Users', 
-              value: response.data.stats.totalUsers.count.toLocaleString(), 
+              value: dashRes.data.stats.totalUsers.count.toLocaleString(), 
               isLoading: false
             },
             { 
               title: 'Events', 
-              value: response.data.stats.activeEvents.count.toString(), 
+              value: eventRes.data.count.toLocaleString(), 
               isLoading: false
             },
             { 
               title: 'Total Bookings', 
-              value: response.data.stats.totalBookings.count.toLocaleString(), 
+              value: dashRes.data.stats.totalBookings.count.toLocaleString(), 
               isLoading: false
             },
             { 
               title: 'Total Donations', 
-              value: `${response.data.stats.totalDonations.amount.toLocaleString()}`, 
+              value: dashRes.data.stats.totalDonations.amount.toLocaleString(), 
               isLoading: false
             }
           ]);
+        } else {
+          // কেউ fail করলে loading=false করে text দেখাবে
+          setStats(prev => prev.map(s => ({ ...s, isLoading: false })));
         }
       } catch (error) {
         console.error('ড্যাশবোর্ড স্ট্যাট লোড করতে সমস্যা হয়েছে:', error);
-        setStats(stats.map(stat => ({ ...stat, isLoading: false })));
+        setStats(prev => prev.map(s => ({ ...s, isLoading: false })));
       }
     };
 

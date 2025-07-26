@@ -146,3 +146,13 @@ export const getPastEvents = async (req: Request, res: Response) => {
   }
 };
 
+
+export const getEventCount = async (req: Request, res: Response) => {
+  try {
+    const count = await Event.countDocuments(); // MongoDB theke total event count
+    return res.status(200).json({ success: true, count });
+  } catch (error) {
+    console.error('❌ Event count আনতে সমস্যা হয়েছে:', error);
+    return res.status(500).json({ success: false, error: 'ইভেন্ট সংখ্যা লোড করতে সমস্যা হয়েছে' });
+  }
+};
