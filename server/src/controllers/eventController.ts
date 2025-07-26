@@ -133,3 +133,16 @@ export const getUpcomingEvents = async (req: Request, res: Response) => {
     return res.status(500).json({ success: false, error: 'Upcoming events load করতে সমস্যা হয়েছে' });
   }
 };
+
+
+export const getPastEvents = async (req: Request, res: Response) => {
+  try {
+    const today = new Date();
+    const events = await Event.find({ endDate: { $lt: today } }).sort({ endDate: -1 });
+    return res.status(200).json({ success: true, data: events });
+  } catch (error) {
+    console.error('❌ Error fetching past events:', error);
+    return res.status(500).json({ success: false, error: 'Past events load করতে সমস্যা হয়েছে' });
+  }
+};
+

@@ -2,7 +2,14 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { createEvent, getAllEvents, updateEvent, deleteEvent,  getUpcomingEvents } from '../controllers/eventController';
+import {
+  createEvent,
+  getAllEvents,
+  updateEvent,
+  deleteEvent,
+  getUpcomingEvents,
+  getPastEvents 
+} from '../controllers/eventController';
 
 const router = express.Router();
 
@@ -41,5 +48,8 @@ router.delete('/:id', deleteEvent);
 
 
 router.get('/upcoming', getUpcomingEvents);
+
+router.get('/history', getPastEvents); // 👈 New route
+
 
 export default router;
