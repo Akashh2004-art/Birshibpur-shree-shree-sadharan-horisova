@@ -13,6 +13,20 @@ interface Event {
   imagePublicId: string;
 }
 
+const getEventStatus = (startDateStr: string, endDateStr: string): string => {
+  const now = new Date();
+  const start = new Date(startDateStr);
+  const end = new Date(endDateStr);
+
+  if (now < start) {
+    return 'আসন্ন';
+  } else if (now >= start && now <= new Date(end.getTime() + 86399999)) {
+    return 'অনুষ্ঠান চলছে';
+  } else {
+    return 'সম্পন্ন';
+  }
+};
+
 const EventManagement = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -146,9 +160,7 @@ const EventManagement = () => {
         {events.map((event, index) => {
           const startDate = new Date(event.startDate);
           const endDate = new Date(event.endDate);
-          const isValidStart = !isNaN(startDate.getTime());
-          const isValidEnd = !isNaN(endDate.getTime());
-          const isUpcoming = isValidEnd && endDate >= new Date();
+          const status = getEventStatus(event.startDate, event.endDate);
 
           return (
             <div
@@ -169,29 +181,29 @@ const EventManagement = () => {
                 <div className="absolute top-2 right-2">
                   <span
                     className={`px-3 py-1 text-sm font-semibold rounded-full ${
-                      isUpcoming
+                      status === 'আসন্ন'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : status === 'অনুষ্ঠান চলছে'
                         ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-800'
-                    } transition-all duration-300 hover:shadow-md`}
+                        : 'bg-gray-200 text-gray-700'
+                    }`}
                   >
-                    {isUpcoming ? 'আসন্ন' : 'সম্পন্ন'}
+                    {status}
                   </span>
                 </div>
               </div>
               <div className="p-4 flex flex-col flex-grow">
                 <h3 className="text-lg font-medium text-gray-900">{event.title}</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  {isValidStart && isValidEnd
-                    ? `${startDate.toLocaleDateString('bn-BD', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })} - ${endDate.toLocaleDateString('bn-BD', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })}`
-                    : 'ভুল তারিখ'}
+                  {startDate.toLocaleDateString('bn-BD', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })} - {endDate.toLocaleDateString('bn-BD', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
                 </p>
                 <p className="mt-2 text-sm text-gray-600 flex-grow">{event.description}</p>
 

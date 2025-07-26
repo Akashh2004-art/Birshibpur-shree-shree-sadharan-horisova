@@ -7,12 +7,23 @@ interface Event {
   title: string;
   startDate: string;
   endDate: string;
-  imageUrl: string; // ✅ Added imageUrl
+  imageUrl: string;
 }
 
 const Dashboard: React.FC = () => {
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
   const [pastEvents, setPastEvents] = useState<Event[]>([]);
+
+  // ✅ Status calculate function
+  const getEventStatus = (startDate: string, endDate: string): string => {
+    const now = new Date();
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (now < start) return 'আসন্ন';
+    if (now >= start && now <= end) return 'অনুষ্ঠান চলছে';
+    return 'সম্পন্ন';
+  };
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -29,6 +40,8 @@ const Dashboard: React.FC = () => {
     };
 
     fetchEvents();
+      const interval = setInterval(fetchEvents, 60000); // fetch every 60 sec
+  return () => clearInterval(interval);
   }, []);
 
   return (
@@ -49,7 +62,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* ✅ Event History with Images */}
+          {/* ✅ Event History */}
           <div
             className="bg-white rounded-lg shadow-lg p-6 hover-scale slide-up transform transition-all duration-300 hover:shadow-xl"
             style={{ animationDelay: '0.3s' }}
@@ -71,7 +84,7 @@ const Dashboard: React.FC = () => {
                       <img
                         src={event.imageUrl}
                         alt={event.title}
-                        className="h-10 w-10 rounded-full object-cover border border-gray-200"
+                        className="h-12 w-12 rounded-full object-cover border border-gray-200"
                       />
                     </div>
                     <div className="ml-4">
@@ -87,7 +100,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* ✅ Upcoming Events with Scrollbar */}
+          {/* ✅ Upcoming Events */}
           <div
             className="bg-white rounded-lg shadow-lg p-6 hover-scale slide-up transform transition-all duration-300 hover:shadow-xl"
             style={{ animationDelay: '0.4s' }}
@@ -100,18 +113,31 @@ const Dashboard: React.FC = () => {
               {upcomingEvents.length === 0 ? (
                 <p className="text-gray-500 text-sm">No upcoming events found.</p>
               ) : (
-                upcomingEvents.map(event => (
-                  <div
-                    key={event._id}
-                    className="p-4 rounded-lg border-l-4 border-indigo-400 bg-white hover:bg-gray-50 transition-all duration-200"
-                  >
-                    <h3 className="text-sm font-medium text-gray-900">{event.title}</h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {new Date(event.startDate).toLocaleDateString()} -{' '}
-                      {new Date(event.endDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                ))
+                upcomingEvents.map(event => {
+                  const status = getEventStatus(event.startDate, event.endDate);
+                  return (
+    <div
+      key={event._id}
+      className="flex items-center p-4 rounded-lg border-l-4 border-indigo-400 bg-white hover:bg-gray-50 transition-all duration-200"
+    >
+      <div className="flex-shrink-0">
+        <img
+          src={event.imageUrl}
+          alt={event.title}
+          className="h-12 w-12 rounded-full object-cover border border-gray-200"
+        />
+      </div>
+      <div className="ml-4">
+        <h3 className="text-sm font-medium text-gray-900">{event.title}</h3>
+        <p className="text-sm text-gray-500">
+          {new Date(event.startDate).toLocaleDateString()} -{' '}
+          {new Date(event.endDate).toLocaleDateString()}
+        </p>
+        <p className="text-sm font-semibold text-indigo-600">{status}</p>
+      </div>
+    </div>
+                  );
+                })
               )}
             </div>
           </div>
