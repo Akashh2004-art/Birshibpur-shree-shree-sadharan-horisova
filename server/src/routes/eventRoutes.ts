@@ -2,7 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { createEvent, getAllEvents, updateEvent, deleteEvent } from '../controllers/eventController';
+import { createEvent, getAllEvents, updateEvent, deleteEvent,  getUpcomingEvents } from '../controllers/eventController';
 
 const router = express.Router();
 
@@ -38,5 +38,8 @@ router.put('/:id', upload.single('image'), updateEvent);
 
 // ✅ Delete event
 router.delete('/:id', deleteEvent);
+
+
+router.get('/upcoming', getUpcomingEvents);
 
 export default router;

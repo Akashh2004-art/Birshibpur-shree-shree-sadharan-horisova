@@ -121,3 +121,15 @@ export const deleteEvent = async (req: Request, res: Response) => {
     return res.status(500).json({ success: false, error: 'সার্ভার সমস্যা হয়েছে' });
   }
 };
+
+
+export const getUpcomingEvents = async (req: Request, res: Response) => {
+  try {
+    const today = new Date();
+    const events = await Event.find({ endDate: { $gte: today } }).sort({ startDate: 1 });
+    return res.status(200).json({ success: true, data: events });
+  } catch (error) {
+    console.error('❌ Error fetching upcoming events:', error);
+    return res.status(500).json({ success: false, error: 'Upcoming events load করতে সমস্যা হয়েছে' });
+  }
+};
