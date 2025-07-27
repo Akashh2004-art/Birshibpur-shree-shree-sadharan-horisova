@@ -122,6 +122,74 @@ export const deleteEvent = async (req: Request, res: Response) => {
   }
 };
 
+export const getEventsForHome = async (req: Request, res: Response) => {
+  try {
+    console.log('🔍 getEventsForHome called'); // Debug log
+    
+    const now = new Date();
+    console.log('⏰ Current time:', now.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })); // Debug log
+    
+    // Get all events and sort by startDate
+    const events = await Event.find().sort({ startDate: 1 });
+    console.log(`📊 Total events found: ${events.length}`); // Debug log
+    
+    // Add status to each event
+    const eventsWithStatus = events.map(event => {
+      const startDate = new Date(event.startDate);
+      const endDate = new Date(event.endDate);
+      
+      // ✅ FIXED: Set end date to 11:59:59 PM of that day
+      const endOfDay = new Date(endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      let status = '';
+      if (startDate > now) {
+        status = 'আসন্ন';
+      } else if (startDate <= now && endOfDay >= now) {
+        // ✅ FIXED: Compare with end of day instead of exact end time
+        status = 'অনুষ্ঠান চলছে';
+      } else {
+        status = 'সম্পন্ন';
+      }
+      
+      console.log(`📅 Event: ${event.title}`); 
+      console.log(`   Status: ${status}`); 
+      console.log(`   Start: ${startDate.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+      console.log(`   End: ${endDate.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+      console.log(`   End of Day: ${endOfDay.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+      console.log(`   Now: ${now.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+      console.log(`   Is Active?: ${startDate <= now && endOfDay >= now}`);
+      console.log('---');
+      
+      return {
+        _id: event._id,
+        title: event.title,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        description: event.description,
+        imageUrl: event.imageUrl,
+        imagePublicId: event.imagePublicId,
+        status,
+        createdAt: event.createdAt,
+        updatedAt: event.updatedAt
+      };
+    });
+    
+    // ✅ FIX: Show both "আসন্ন" AND "অনুষ্ঠান চলছে" events, hide only "সম্পন্ন"
+    const activeEvents = eventsWithStatus.filter(event => 
+      event.status === 'আসন্ন' || event.status === 'অনুষ্ঠান চলছে'
+    );
+    
+    console.log(`✅ Active events count: ${activeEvents.length}`); // Debug log
+    console.log('📤 Returning active events:', activeEvents.map(e => `${e.title} (${e.status})`)); // Debug log
+    
+    return res.status(200).json({ success: true, data: activeEvents });
+  } catch (error) {
+    console.error('❌ Error fetching events for home:', error);
+    return res.status(500).json({ success: false, error: 'হোম পেজের ইভেন্ট লোড করতে সমস্যা হয়েছে' });
+  }
+};
+
 // ✅ FIXED: End date ke 11:59:59 PM porjonto extend kora holo
 export const getUpcomingEvents = async (req: Request, res: Response) => {
   try {

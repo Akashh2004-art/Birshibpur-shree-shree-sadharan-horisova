@@ -9,7 +9,8 @@ import {
   deleteEvent,
   getUpcomingEvents,
   getPastEvents,
-  getEventCount
+  getEventCount,
+  getEventsForHome // ✅ Import the new function
 } from '../controllers/eventController';
 
 const router = express.Router();
@@ -35,24 +36,29 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
+// ✅ IMPORTANT: Specific routes MUST come BEFORE parameterized routes
+// ✅ Get events for Home page with status (MOVED TO TOP)
+router.get('/home', getEventsForHome);
+
+// ✅ Get upcoming events (MOVED TO TOP)
+router.get('/upcoming', getUpcomingEvents);
+
+// ✅ Get past events (MOVED TO TOP)
+router.get('/history', getPastEvents);
+
+// ✅ Get event count (MOVED TO TOP)
+router.get('/count', getEventCount);
+
 // ✅ Create event
 router.post('/', upload.single('image'), createEvent);
 
 // ✅ Get all events
 router.get('/', getAllEvents);
 
-// ✅ Update event
+// ✅ Update event (parameterized route AFTER specific routes)
 router.put('/:id', upload.single('image'), updateEvent);
 
-// ✅ Delete event
+// ✅ Delete event (parameterized route AFTER specific routes)
 router.delete('/:id', deleteEvent);
-
-
-router.get('/upcoming', getUpcomingEvents);
-
-router.get('/history', getPastEvents); // 👈 New route
-
-router.get('/count', getEventCount);
-
 
 export default router;

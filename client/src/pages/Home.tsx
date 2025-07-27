@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { pujaServices } from './Booking';
 import { donationTypes } from './Donations';
+import { getEventsForHome } from '../utils/api';
 
 interface PujaTiming {
   name: string;
@@ -9,57 +10,60 @@ interface PujaTiming {
   description: string;
 }
 
-// Shared Event interface
+// Updated Event interface to match backend
 interface Event {
-  id: number;
+  _id: string;
   title: string;
-  date: string;
-  time: string;
+  startDate: string;
+  endDate: string;
   description: string;
-  image: string;
-  location: string;
-  organizer: string;
-  contactNumber: string;
+  imageUrl: string;
+  imagePublicId: string;
+  status: 'আসন্ন' | 'অনুষ্ঠান চলছে' | 'সম্পন্ন';
+  createdAt: string;
+  updatedAt: string;
 }
-
-// Shared events data
-export const events: Event[] = [
-  {
-    id: 1,
-    title: "দুর্গা পূজা ২০২৪",
-    date: "2024-10-12",
-    time: "6:00 AM",
-    description: "বার্ষিক দুর্গা পূজা উৎসব। সকাল ৬টা থেকে রাত ১০টা পর্যন্ত বিভিন্ন অনুষ্ঠান।",
-    image: "/assets/image/temple.jpg",
-    location: "মন্দির প্রাঙ্গণ",
-    organizer: "পূজা কমিটি",
-    contactNumber: "+91 1234567890"
-  },
-  {
-    id: 2,
-    title: "কালী পূজা ২০২৪",
-    date: "2024-11-02",
-    time: "7:00 PM",
-    description: "বার্ষিক কালী পূজা। সন্ধ্যা ৭টা থেকে রাত ১২টা পর্যন্ত বিশেষ পূজা ও প্রসাদ বিতরণ।",
-    image: "/assets/image/temple.jpg",
-    location: "মন্দির প্রাঙ্গণ",
-    organizer: "পূজা কমিটি",
-    contactNumber: "+91 1234567890"
-  }
-];
 
 const Home = () => {
   const [activeEventIndex, setActiveEventIndex] = useState(0);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  // Fetch events from backend
   useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveEventIndex((current) => 
-        current === events.length - 1 ? 0 : current + 1
-      );
-    }, 3000);
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        const response = await getEventsForHome();
+        if (response.success) {
+          setEvents(response.data);
+        } else {
+          setError('ইভেন্ট লোড করতে সমস্যা হয়েছে');
+        }
+      } catch (err) {
+        console.error('Events fetch error:', err);
+        setError('ইভেন্ট লোড করতে সমস্যা হয়েছে');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    return () => clearInterval(timer);
+    fetchEvents();
   }, []);
+
+  // Auto-scroll through events
+  useEffect(() => {
+    if (events.length > 0) {
+      const timer = setInterval(() => {
+        setActiveEventIndex((current) => 
+          current === events.length - 1 ? 0 : current + 1
+        );
+      }, 4000); // Increased interval to 4 seconds
+
+      return () => clearInterval(timer);
+    }
+  }, [events.length]);
 
   const pujaTimings: PujaTiming[] = [
     {
@@ -78,6 +82,28 @@ const Home = () => {
       description: "Evening devotional ceremony"
     }
   ];
+
+  // Helper function to format date
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('bn-BD', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  };
+
+  // Helper function to get status badge color
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case 'আসন্ন':
+        return 'bg-blue-100 text-blue-800';
+      case 'অনুষ্ঠান চলছে':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
 
   return (
     <div className="min-h-screen">
@@ -149,50 +175,91 @@ const Home = () => {
       {/* Events Section */}
       <section className="py-10 md:py-16 bg-gray-50">
         <div className="container mx-auto px-4">
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-4">আসন্ন অনুষ্ঠান</h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-center mb-4">অনুষ্ঠান সূচি</h2>
           <p className="text-sm md:text-base text-center text-gray-600 mb-8">
             আমাদের মন্দিরে আগামী দিনগুলিতে অনুষ্ঠিত হতে যাওয়া বিভিন্ন অনুষ্ঠানের তালিকা
           </p>
 
-          <div className="relative overflow-hidden">
-            <div className="flex transition-transform duration-500 ease-in-out"
-                 style={{ transform: `translateX(-${activeEventIndex * 100}%)` }}>
-              {events.map((event) => (
-                <div
-                  key={event.id}
-                  className="w-full flex-shrink-0 px-4"
-                >
-                  <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow max-w-2xl mx-auto">
-                    <div className="relative h-48">
-                      <img 
-                        src={event.image} 
-                        alt={event.title}
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="p-4 md:p-6">
-                      <h3 className="text-lg md:text-xl font-bold mb-2">{event.title}</h3>
-                      <p className="text-sm md:text-base text-gray-600 mb-4">{event.description}</p>
-                      <div className="flex flex-wrap items-center text-sm text-gray-500 gap-4">
-                        <span className="flex items-center">
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                          </svg>
-                          {new Date(event.date).toLocaleDateString('bn-BD')}
-                        </span>
-                        <span className="flex items-center">
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                          </svg>
-                          {event.time}
-                        </span>
+          {loading ? (
+            <div className="flex justify-center items-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+              <span className="ml-3 text-gray-600">ইভেন্ট লোড করা হচ্ছে...</span>
+            </div>
+          ) : error ? (
+            <div className="text-center py-16">
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded max-w-md mx-auto">
+                <p>{error}</p>
+              </div>
+            </div>
+          ) : events.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded max-w-md mx-auto">
+                <p>কোনো আসন্ন ইভেন্ট নেই</p>
+              </div>
+            </div>
+          ) : (
+            <div className="relative overflow-hidden">
+              <div className="flex transition-transform duration-500 ease-in-out"
+                   style={{ transform: `translateX(-${activeEventIndex * 100}%)` }}>
+                {events.map((event) => (
+                  <div
+                    key={event._id}
+                    className="w-full flex-shrink-0 px-4"
+                  >
+                    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow max-w-2xl mx-auto">
+                      <div className="relative h-48">
+                        <img 
+                          src={event.imageUrl} 
+                          alt={event.title}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/assets/image/temple.jpg"; // Fallback image
+                          }}
+                        />
+                        {/* Status Badge */}
+                        <div className="absolute top-4 right-4">
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeColor(event.status)}`}>
+                            {event.status}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="p-4 md:p-6">
+                        <h3 className="text-lg md:text-xl font-bold mb-2">{event.title}</h3>
+                        <p className="text-sm md:text-base text-gray-600 mb-4 line-clamp-3">{event.description}</p>
+                        <div className="flex flex-wrap items-center text-sm text-gray-500 gap-4">
+                          <span className="flex items-center">
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                            {formatDate(event.startDate)}
+                            {event.startDate !== event.endDate && (
+                              <span> - {formatDate(event.endDate)}</span>
+                            )}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
+                ))}
+              </div>
+              
+              {/* Navigation Dots */}
+              {events.length > 1 && (
+                <div className="flex justify-center mt-6 space-x-2">
+                  {events.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setActiveEventIndex(index)}
+                      className={`w-3 h-3 rounded-full transition-colors ${
+                        index === activeEventIndex ? 'bg-orange-500' : 'bg-gray-300'
+                      }`}
+                    />
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          </div>
+          )}
         </div>
       </section>
 

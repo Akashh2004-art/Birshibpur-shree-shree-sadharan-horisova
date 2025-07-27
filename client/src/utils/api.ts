@@ -94,6 +94,23 @@ export const setNewPassword = (emailOrPhone: string, otp: string, password: stri
   });
 };
 
+// ✅ NEW: Event API functions
+export const getEventsForHome = () => {
+  return request('/events/home', { method: 'GET' });
+};
+
+export const getAllEvents = () => {
+  return request('/events', { method: 'GET' });
+};
+
+export const getUpcomingEvents = () => {
+  return request('/events/upcoming', { method: 'GET' });
+};
+
+export const getPastEvents = () => {
+  return request('/events/history', { method: 'GET' });
+};
+
 export const api = {
   get: (endpoint: string, config: RequestConfig = {}) => 
     request(endpoint, { ...config, method: 'GET' }),
@@ -105,4 +122,14 @@ export const api = {
     request(endpoint, { method: 'DELETE', ...config }),
 };
 
-export default { userLogin, api, sendForgotPasswordRequest, verifyOTP, setNewPassword };
+export default { 
+  userLogin, 
+  api, 
+  sendForgotPasswordRequest, 
+  verifyOTP, 
+  setNewPassword,
+  getEventsForHome,
+  getAllEvents,
+  getUpcomingEvents,
+  getPastEvents
+};
