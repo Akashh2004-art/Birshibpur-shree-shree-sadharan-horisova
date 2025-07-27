@@ -13,14 +13,19 @@ interface Event {
   imagePublicId: string;
 }
 
+// ✅ FIXED: End date ke 11:59:59 PM porjonto consider kora holo
 const getEventStatus = (startDateStr: string, endDateStr: string): string => {
   const now = new Date();
   const start = new Date(startDateStr);
   const end = new Date(endDateStr);
+  
+  // End date ke 11:59:59 PM porjonto extend kora
+  const endOfDay = new Date(end);
+  endOfDay.setHours(23, 59, 59, 999);
 
   if (now < start) {
     return 'আসন্ন';
-  } else if (now >= start && now <= new Date(end.getTime() + 86399999)) {
+  } else if (now >= start && now <= endOfDay) {
     return 'অনুষ্ঠান চলছে';
   } else {
     return 'সম্পন্ন';

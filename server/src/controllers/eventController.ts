@@ -122,11 +122,25 @@ export const deleteEvent = async (req: Request, res: Response) => {
   }
 };
 
-
+// ✅ FIXED: End date ke 11:59:59 PM porjonto extend kora holo
 export const getUpcomingEvents = async (req: Request, res: Response) => {
   try {
-    const today = new Date();
-    const events = await Event.find({ endDate: { $gte: today } }).sort({ startDate: 1 });
+    // Current date/time 
+    const now = new Date();
+    
+    // Today's date at 11:59:59 PM
+    const todayEndOfDay = new Date();
+    todayEndOfDay.setHours(23, 59, 59, 999);
+    
+    // Events jekhane endDate >= today's start (00:00:00)
+    // Mane ajo theke future e jegulo ache
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    
+    const events = await Event.find({ 
+      endDate: { $gte: todayStart } 
+    }).sort({ startDate: 1 });
+    
     return res.status(200).json({ success: true, data: events });
   } catch (error) {
     console.error('❌ Error fetching upcoming events:', error);
@@ -134,18 +148,29 @@ export const getUpcomingEvents = async (req: Request, res: Response) => {
   }
 };
 
-
+// ✅ FIXED: Past events ke properly filter kora holo
 export const getPastEvents = async (req: Request, res: Response) => {
   try {
-    const today = new Date();
-    const events = await Event.find({ endDate: { $lt: today } }).sort({ endDate: -1 });
+    // Yesterday's end time (23:59:59)
+    const yesterdayEnd = new Date();
+    yesterdayEnd.setDate(yesterdayEnd.getDate() - 1);
+    yesterdayEnd.setHours(23, 59, 59, 999);
+    
+    // Events jekhane endDate < today's start (00:00:00)
+    // Mane ajker age je gulo shesh hoye geche
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    
+    const events = await Event.find({ 
+      endDate: { $lt: todayStart } 
+    }).sort({ endDate: -1 });
+    
     return res.status(200).json({ success: true, data: events });
   } catch (error) {
     console.error('❌ Error fetching past events:', error);
     return res.status(500).json({ success: false, error: 'Past events load করতে সমস্যা হয়েছে' });
   }
 };
-
 
 export const getEventCount = async (req: Request, res: Response) => {
   try {

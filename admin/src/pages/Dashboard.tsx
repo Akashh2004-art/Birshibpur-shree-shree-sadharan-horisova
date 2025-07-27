@@ -14,14 +14,18 @@ const Dashboard: React.FC = () => {
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
   const [pastEvents, setPastEvents] = useState<Event[]>([]);
 
-  // ✅ Status calculate function
+  // ✅ FIXED: Status calculate function with proper end date handling
   const getEventStatus = (startDate: string, endDate: string): string => {
     const now = new Date();
     const start = new Date(startDate);
     const end = new Date(endDate);
+    
+    // End date ke 11:59:59 PM porjonto extend kora
+    const endOfDay = new Date(end);
+    endOfDay.setHours(23, 59, 59, 999);
 
     if (now < start) return 'আসন্ন';
-    if (now >= start && now <= end) return 'অনুষ্ঠান চলছে';
+    if (now >= start && now <= endOfDay) return 'অনুষ্ঠান চলছে';
     return 'সম্পন্ন';
   };
 
@@ -40,8 +44,8 @@ const Dashboard: React.FC = () => {
     };
 
     fetchEvents();
-      const interval = setInterval(fetchEvents, 60000); // fetch every 60 sec
-  return () => clearInterval(interval);
+    const interval = setInterval(fetchEvents, 60000); // fetch every 60 sec
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -116,26 +120,26 @@ const Dashboard: React.FC = () => {
                 upcomingEvents.map(event => {
                   const status = getEventStatus(event.startDate, event.endDate);
                   return (
-    <div
-      key={event._id}
-      className="flex items-center p-4 rounded-lg border-l-4 border-indigo-400 bg-white hover:bg-gray-50 transition-all duration-200"
-    >
-      <div className="flex-shrink-0">
-        <img
-          src={event.imageUrl}
-          alt={event.title}
-          className="h-12 w-12 rounded-full object-cover border border-gray-200"
-        />
-      </div>
-      <div className="ml-4">
-        <h3 className="text-sm font-medium text-gray-900">{event.title}</h3>
-        <p className="text-sm text-gray-500">
-          {new Date(event.startDate).toLocaleDateString()} -{' '}
-          {new Date(event.endDate).toLocaleDateString()}
-        </p>
-        <p className="text-sm font-semibold text-indigo-600">{status}</p>
-      </div>
-    </div>
+                    <div
+                      key={event._id}
+                      className="flex items-center p-4 rounded-lg border-l-4 border-indigo-400 bg-white hover:bg-gray-50 transition-all duration-200"
+                    >
+                      <div className="flex-shrink-0">
+                        <img
+                          src={event.imageUrl}
+                          alt={event.title}
+                          className="h-12 w-12 rounded-full object-cover border border-gray-200"
+                        />
+                      </div>
+                      <div className="ml-4">
+                        <h3 className="text-sm font-medium text-gray-900">{event.title}</h3>
+                        <p className="text-sm text-gray-500">
+                          {new Date(event.startDate).toLocaleDateString()} -{' '}
+                          {new Date(event.endDate).toLocaleDateString()}
+                        </p>
+                        <p className="text-sm font-semibold text-indigo-600">{status}</p>
+                      </div>
+                    </div>
                   );
                 })
               )}
