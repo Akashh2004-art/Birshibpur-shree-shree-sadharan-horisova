@@ -24,14 +24,14 @@ export const verifyFirebaseToken = async (
       ? authHeader.split(' ')[1] 
       : req.body.token; // Fallback to body if not in header
 
-    console.log('📢 Firebase Token Received:', token); // Debugging
+    // console.log('📢 Firebase Token Received:', token); // Debugging
 
     if (!token) {
       return res.status(401).json({ success: false, message: 'No token provided' });
     }
 
     const decodedToken = await admin.auth().verifyIdToken(token);
-    console.log('✅ Firebase Token Decoded:', decodedToken); // Debugging
+    // console.log('✅ Firebase Token Decoded:', decodedToken); // Debugging
 
     req.user = {
       email: decodedToken.email || '',
@@ -55,7 +55,7 @@ export const authenticateJWT = (
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
 
-  console.log('📢 Received JWT:', token); // Debugging
+  // console.log('📢 Received JWT:', token); // Debugging
 
   if (!token) {
     console.log('❌ No JWT found in request headers!');
@@ -64,7 +64,7 @@ export const authenticateJWT = (
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { id: string; email: string };
-    console.log('✅ JWT Verified:', decoded); // Debugging
+    // console.log('✅ JWT Verified:', decoded); // Debugging
     req.user = {
       email: decoded.email,
       uid: decoded.id,
@@ -94,7 +94,7 @@ export const authenticateAdmin = async (
     // Verify token
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'akashsaha0751');
 
-    console.log('✅ Decoded Token:', decoded); // Debugging
+    // console.log('✅ Decoded Token:', decoded); // Debugging
 
     // Check if user is admin (Fix: Checking role instead of isAdmin)
     if (decoded.role !== 'admin') {

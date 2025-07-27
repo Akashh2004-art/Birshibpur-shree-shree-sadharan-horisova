@@ -207,7 +207,7 @@ const Home = () => {
                     className="w-full flex-shrink-0 px-4"
                   >
                     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow max-w-2xl mx-auto">
-                      <div className="relative h-48">
+                      <div className="relative h-80">
                         <img 
                           src={event.imageUrl} 
                           alt={event.title}
