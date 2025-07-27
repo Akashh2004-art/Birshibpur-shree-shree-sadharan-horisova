@@ -76,10 +76,8 @@ const startServer = async () => {
 
     // Socket.io setup
     io.on("connection", (socket) => {
-      console.log("A user connected:", socket.id);
 
       socket.on("disconnect", () => {
-        console.log("User disconnected:", socket.id);
       });
     });
 
@@ -94,23 +92,18 @@ const startServer = async () => {
 
     // Routes
     app.use("/api/user", userAuthRoutes);
-    console.log("✅ User Auth Routes Loaded Successfully!");
     app.use("/api/auth", authRoutes);
     app.use("/api/admin", adminRoutes);
     app.use("/api/password", passwordRoutes);
     app.use("/api/user", userPasswordRoutes);
     app.use("/api/notifications", notificationRoutes);
-    app.use("/api/dashboard", dashboardRoutes); // ড্যাশবোর্ড রাউট যোগ করা হয়েছে
-    console.log("✅ Dashboard Routes Loaded Successfully!");
+    app.use("/api/dashboard", dashboardRoutes); 
     app.use("/api/user", userAuthRoutes);
-    console.log("✅ User Auth Routes Loaded Successfully!");
-    app.use("/api/events", eventRoutes); // Add this line
-    console.log("✅ Event Routes Loaded Successfully!");
-    // Debugging: Log all registered routes
+    app.use("/api/events", eventRoutes); 
+
     if (process.env.NODE_ENV === "development") {
       app._router.stack.forEach((r: any) => {
         if (r.route && r.route.path) {
-          console.log(`🛠 Registered Route: ${r.route.path}`);
         }
       });
     }

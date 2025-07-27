@@ -38,7 +38,6 @@ export const createEvent = async (req: Request & { file?: Express.Multer.File },
 
     return res.status(201).json({ success: true, message: 'ইভেন্ট সফলভাবে তৈরি হয়েছে', data: event });
   } catch (error) {
-    console.error('❌ Error creating event:', error);
     if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     return res.status(500).json({ success: false, error: 'সার্ভার এ একটি সমস্যা হয়েছে' });
   }
@@ -49,7 +48,6 @@ export const getAllEvents = async (req: Request, res: Response) => {
     const events = await Event.find().sort({ createdAt: -1 });
     return res.status(200).json({ success: true, data: events });
   } catch (error) {
-    console.error('❌ Error fetching events:', error);
     return res.status(500).json({ success: false, error: 'ইভেন্ট লোড করতে সমস্যা হয়েছে' });
   }
 };
@@ -94,7 +92,6 @@ export const updateEvent = async (req: Request & { file?: Express.Multer.File },
 
     return res.status(200).json({ success: true, message: 'ইভেন্ট আপডেট সফল হয়েছে', data: existingEvent });
   } catch (error) {
-    console.error('❌ Update Error:', error);
     if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     return res.status(500).json({ success: false, error: 'সার্ভার সমস্যা হয়েছে' });
   }
@@ -117,21 +114,15 @@ export const deleteEvent = async (req: Request, res: Response) => {
 
     return res.status(200).json({ success: true, message: 'ইভেন্ট সফলভাবে মুছে ফেলা হয়েছে' });
   } catch (error) {
-    console.error('❌ Delete Error:', error);
     return res.status(500).json({ success: false, error: 'সার্ভার সমস্যা হয়েছে' });
   }
 };
 
 export const getEventsForHome = async (req: Request, res: Response) => {
   try {
-    console.log('🔍 getEventsForHome called'); // Debug log
     
     const now = new Date();
-    console.log('⏰ Current time:', now.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })); // Debug log
-    
-    // Get all events and sort by startDate
     const events = await Event.find().sort({ startDate: 1 });
-    console.log(`📊 Total events found: ${events.length}`); // Debug log
     
     // Add status to each event
     const eventsWithStatus = events.map(event => {
@@ -152,15 +143,6 @@ export const getEventsForHome = async (req: Request, res: Response) => {
         status = 'সম্পন্ন';
       }
       
-      console.log(`📅 Event: ${event.title}`); 
-      console.log(`   Status: ${status}`); 
-      console.log(`   Start: ${startDate.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
-      console.log(`   End: ${endDate.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
-      console.log(`   End of Day: ${endOfDay.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
-      console.log(`   Now: ${now.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
-      console.log(`   Is Active?: ${startDate <= now && endOfDay >= now}`);
-      console.log('---');
-      
       return {
         _id: event._id,
         title: event.title,
@@ -180,12 +162,8 @@ export const getEventsForHome = async (req: Request, res: Response) => {
       event.status === 'আসন্ন' || event.status === 'অনুষ্ঠান চলছে'
     );
     
-    console.log(`✅ Active events count: ${activeEvents.length}`); // Debug log
-    console.log('📤 Returning active events:', activeEvents.map(e => `${e.title} (${e.status})`)); // Debug log
-    
     return res.status(200).json({ success: true, data: activeEvents });
   } catch (error) {
-    console.error('❌ Error fetching events for home:', error);
     return res.status(500).json({ success: false, error: 'হোম পেজের ইভেন্ট লোড করতে সমস্যা হয়েছে' });
   }
 };
@@ -211,7 +189,6 @@ export const getUpcomingEvents = async (req: Request, res: Response) => {
     
     return res.status(200).json({ success: true, data: events });
   } catch (error) {
-    console.error('❌ Error fetching upcoming events:', error);
     return res.status(500).json({ success: false, error: 'Upcoming events load করতে সমস্যা হয়েছে' });
   }
 };
@@ -235,7 +212,6 @@ export const getPastEvents = async (req: Request, res: Response) => {
     
     return res.status(200).json({ success: true, data: events });
   } catch (error) {
-    console.error('❌ Error fetching past events:', error);
     return res.status(500).json({ success: false, error: 'Past events load করতে সমস্যা হয়েছে' });
   }
 };
@@ -245,7 +221,6 @@ export const getEventCount = async (req: Request, res: Response) => {
     const count = await Event.countDocuments(); // MongoDB theke total event count
     return res.status(200).json({ success: true, count });
   } catch (error) {
-    console.error('❌ Event count আনতে সমস্যা হয়েছে:', error);
     return res.status(500).json({ success: false, error: 'ইভেন্ট সংখ্যা লোড করতে সমস্যা হয়েছে' });
   }
 };
