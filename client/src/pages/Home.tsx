@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { pujaServices } from './Booking';
 import { donationTypes } from './Donations';
 import { getEventsForHome } from '../utils/api';
@@ -10,7 +10,6 @@ interface PujaTiming {
   description: string;
 }
 
-// Updated Event interface to match backend
 interface Event {
   _id: string;
   title: string;
@@ -25,12 +24,12 @@ interface Event {
 }
 
 const Home = () => {
+  const navigate = useNavigate();
   const [activeEventIndex, setActiveEventIndex] = useState(0);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch events from backend
   useEffect(() => {
     const fetchEvents = async () => {
       try {
@@ -52,15 +51,13 @@ const Home = () => {
     fetchEvents();
   }, []);
 
-  // Auto-scroll through events
   useEffect(() => {
     if (events.length > 0) {
       const timer = setInterval(() => {
-        setActiveEventIndex((current) => 
+        setActiveEventIndex((current) =>
           current === events.length - 1 ? 0 : current + 1
         );
-      }, 4000); // Increased interval to 4 seconds
-
+      }, 5000);
       return () => clearInterval(timer);
     }
   }, [events.length]);
@@ -83,7 +80,6 @@ const Home = () => {
     }
   ];
 
-  // Helper function to format date
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('bn-BD', {
@@ -93,7 +89,6 @@ const Home = () => {
     });
   };
 
-  // Helper function to get status badge color
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case 'আসন্ন':
@@ -103,6 +98,10 @@ const Home = () => {
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const handleGoToEvents = () => {
+    navigate('/events');
   };
 
   return (
@@ -136,8 +135,8 @@ const Home = () => {
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-2xl md:text-3xl font-bold mb-4">About Our Temple</h2>
             <p className="text-sm md:text-base text-gray-600 mb-6">
-              Founded in 1950, our temple has been a spiritual beacon for over seven decades. 
-              We are dedicated to preserving and sharing ancient traditions while fostering 
+              Founded in 1950, our temple has been a spiritual beacon for over seven decades.
+              We are dedicated to preserving and sharing ancient traditions while fostering
               a welcoming community for all seekers of spiritual wisdom.
             </p>
             <Link
@@ -146,7 +145,7 @@ const Home = () => {
             >
               <span>Read Our Full History</span>
               <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
               </svg>
             </Link>
           </div>
@@ -173,95 +172,115 @@ const Home = () => {
       </section>
 
       {/* Events Section */}
-      <section className="py-10 md:py-16 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-4">অনুষ্ঠান সূচি</h2>
-          <p className="text-sm md:text-base text-center text-gray-600 mb-8">
-            আমাদের মন্দিরে আগামী দিনগুলিতে অনুষ্ঠিত হতে যাওয়া বিভিন্ন অনুষ্ঠানের তালিকা
-          </p>
+{/* Events Section */}
+<section className="py-10 md:py-16 bg-gray-50">
+  <div className="container mx-auto px-4">
+    <h2
+      className="text-2xl md:text-3xl font-bold text-center mb-4 cursor-pointer"
+      onClick={handleGoToEvents}
+    >
+      অনুষ্ঠান সূচি
+    </h2>
+    <p className="text-sm md:text-base text-center text-gray-600 mb-8">
+      আমাদের মন্দিরে আগামী দিনগুলিতে অনুষ্ঠিত হতে যাওয়া বিভিন্ন অনুষ্ঠানের তালিকা
+    </p>
 
-          {loading ? (
-            <div className="flex justify-center items-center py-16">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
-              <span className="ml-3 text-gray-600">ইভেন্ট লোড করা হচ্ছে...</span>
-            </div>
-          ) : error ? (
-            <div className="text-center py-16">
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded max-w-md mx-auto">
-                <p>{error}</p>
-              </div>
-            </div>
-          ) : events.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded max-w-md mx-auto">
-                <p>কোনো আসন্ন ইভেন্ট নেই</p>
-              </div>
-            </div>
-          ) : (
-            <div className="relative overflow-hidden">
-              <div className="flex transition-transform duration-500 ease-in-out"
-                   style={{ transform: `translateX(-${activeEventIndex * 100}%)` }}>
-                {events.map((event) => (
-                  <div
-                    key={event._id}
-                    className="w-full flex-shrink-0 px-4"
-                  >
-                    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow max-w-2xl mx-auto">
-                      <div className="relative h-80">
-                        <img 
-                          src={event.imageUrl} 
-                          alt={event.title}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src = "/assets/image/temple.jpg"; // Fallback image
-                          }}
-                        />
-                        {/* Status Badge */}
-                        <div className="absolute top-4 right-4">
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeColor(event.status)}`}>
-                            {event.status}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="p-4 md:p-6">
-                        <h3 className="text-lg md:text-xl font-bold mb-2">{event.title}</h3>
-                        <p className="text-sm md:text-base text-gray-600 mb-4 line-clamp-3">{event.description}</p>
-                        <div className="flex flex-wrap items-center text-sm text-gray-500 gap-4">
-                          <span className="flex items-center">
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                            </svg>
-                            {formatDate(event.startDate)}
-                            {event.startDate !== event.endDate && (
-                              <span> - {formatDate(event.endDate)}</span>
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {/* Navigation Dots */}
-              {events.length > 1 && (
-                <div className="flex justify-center mt-6 space-x-2">
-                  {events.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setActiveEventIndex(index)}
-                      className={`w-3 h-3 rounded-full transition-colors ${
-                        index === activeEventIndex ? 'bg-orange-500' : 'bg-gray-300'
-                      }`}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+    {loading ? (
+      <div className="flex justify-center items-center py-16">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+        <span className="ml-3 text-gray-600">ইভেন্ট লোড করা হচ্ছে...</span>
+      </div>
+    ) : error ? (
+      <div className="text-center py-16">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded max-w-md mx-auto">
+          <p>{error}</p>
         </div>
-      </section>
+      </div>
+    ) : events.length === 0 ? (
+      <div className="text-center py-16">
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded max-w-md mx-auto">
+          <p>কোনো আসন্ন ইভেন্ট নেই</p>
+        </div>
+      </div>
+    ) : (
+      <div className="relative overflow-hidden">
+        <div
+          className="flex transition-transform duration-500 ease-in-out"
+          style={{ transform: `translateX(-${activeEventIndex * 100}%)` }}
+        >
+          {events.map((event) => (
+            <div key={event._id} className="w-full flex-shrink-0 px-4">
+              <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow max-w-2xl mx-auto">
+                <div className="relative h-80">
+                  <img
+                    src={event.imageUrl}
+                    alt={event.title}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = "/assets/image/temple.jpg";
+                    }}
+                  />
+                  <div className="absolute top-4 right-4">
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeColor(
+                        event.status
+                      )}`}
+                    >
+                      {event.status}
+                    </span>
+                  </div>
+                </div>
+                <div className="p-4 md:p-6">
+                  <h3 className="text-lg md:text-xl font-bold mb-2">{event.title}</h3>
+                  <p className="text-sm md:text-base text-gray-600 mb-4 line-clamp-3">
+                    {event.description}
+                  </p>
+                  <div className="flex flex-wrap items-center text-sm text-gray-500 gap-4">
+                    <span className="flex items-center">
+                      <svg
+                        className="w-4 h-4 mr-1"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                      {formatDate(event.startDate)}
+                      {event.startDate !== event.endDate && (
+                        <span> - {formatDate(event.endDate)}</span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {events.length > 1 && (
+          <div className="flex justify-center mt-6 space-x-2">
+            {events.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setActiveEventIndex(index)}
+                className={`w-3 h-3 rounded-full transition-colors ${
+                  index === activeEventIndex ? 'bg-orange-500' : 'bg-gray-300'
+                }`}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+</section>
+
 
       {/* Services Section */}
       <section className="py-10 md:py-16">
@@ -270,13 +289,9 @@ const Home = () => {
           <p className="text-sm md:text-base text-center text-gray-600 mb-8">
             আমাদের মন্দিরে নিয়মিত পূজা অর্চনার জন্য আপনার পছন্দের সময় বুকিং করুন
           </p>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {pujaServices.slice(0, 3).map((service) => (
-              <div
-                key={service.id}
-                className="bg-white rounded-lg shadow-md p-4 md:p-6 hover:shadow-lg transition-shadow"
-              >
+              <div key={service.id} className="bg-white rounded-lg shadow-md p-4 md:p-6 hover:shadow-lg transition-shadow">
                 <h3 className="text-lg md:text-xl font-bold mb-3">{service.name}</h3>
                 <p className="text-sm md:text-base text-gray-600 mb-4">{service.description}</p>
                 <p className="text-sm text-gray-500 mb-4">⏱️ সময়কালঃ {service.duration}</p>
@@ -299,19 +314,11 @@ const Home = () => {
           <p className="text-sm md:text-base text-center text-gray-600 mb-8">
             মন্দিরের উন্নয়ন ও সেবা কার্যক্রমে আপনার অবদান রাখুন
           </p>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
             {donationTypes.slice(0, 3).map((type) => (
-              <div
-                key={type.id}
-                className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
-              >
+              <div key={type.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
                 <div className="relative h-48">
-                  <img
-                    src={type.image}
-                    alt={type.name}
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
+                  <img src={type.image} alt={type.name} className="absolute inset-0 w-full h-full object-cover" />
                 </div>
                 <div className="p-4 md:p-6">
                   <h3 className="text-lg md:text-xl font-bold mb-2">{type.name}</h3>

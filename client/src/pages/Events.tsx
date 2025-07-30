@@ -21,26 +21,29 @@ const Events = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Fetch events for home (only আসন্ন and অনুষ্ঠান চলছে)
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        setLoading(true);
-        const response = await getEventsForHome(); // ✅ CHANGED: Use getEventsForHome instead
-        if (response.success) {
-          setEvents(response.data);
-        } else {
-          setError('ইভেন্ট লোড করতে সমস্যা হয়েছে');
-        }
-      } catch (err) {
-        console.error('Events fetch error:', err);
-        setError('ইভেন্ট লোড করতে সমস্যা হয়েছে');
-      } finally {
-        setLoading(false);
-      }
-    };
+useEffect(() => {
+  window.scrollTo(0, 0); // 🔼 scroll to top
 
-    fetchEvents();
-  }, []);
+  const fetchEvents = async () => {
+    try {
+      setLoading(true);
+      const response = await getEventsForHome(); // ✅ CHANGED: Use getEventsForHome instead
+      if (response.success) {
+        setEvents(response.data);
+      } else {
+        setError('ইভেন্ট লোড করতে সমস্যা হয়েছে');
+      }
+    } catch (err) {
+      console.error('Events fetch error:', err);
+      setError('ইভেন্ট লোড করতে সমস্যা হয়েছে');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchEvents();
+}, []);
+
 
   // Helper function to format date
   const formatDate = (dateString: string) => {

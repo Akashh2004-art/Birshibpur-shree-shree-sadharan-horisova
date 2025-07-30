@@ -8,18 +8,14 @@
   font-weight: 400;
 }
 
-/* Global styles */
-html {
-  overflow: hidden;
+
+html, body, #root {
   height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
 }
 
-body {
-  margin: 0;
-  min-width: 320px;
-  height: 100%;
-  overflow: hidden;
-}
 
 #root {
   height: 100%;

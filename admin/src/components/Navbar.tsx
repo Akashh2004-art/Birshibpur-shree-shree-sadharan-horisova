@@ -53,7 +53,7 @@ const Navbar = () => {
 
   return (
     <nav className="bg-white shadow-md relative z-50">
-      <div className="flex justify-between items-center px-4 py-4">
+      <div className="flex justify-between items-center py-4">
         <h1 className="text-gray-800 text-2xl font-bold">
           <motion.span
             initial={{ opacity: 0, y: -20 }}
