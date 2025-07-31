@@ -120,8 +120,28 @@ const EventManagement = () => {
     }
   };
 
+  // ✅ Separate active and past events
+  const activeEvents = events.filter(event => {
+    const status = getEventStatus(event.startDate, event.endDate);
+    return status === 'আসন্ন' || status === 'অনুষ্ঠান চলছে';
+  });
+
+  const pastEvents = events.filter(event => {
+    const status = getEventStatus(event.startDate, event.endDate);
+    return status === 'সম্পন্ন';
+  });
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('bn-BD', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  };
+
   return (
-<div className="min-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 p-6">
+    <div className="min-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 p-6">
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-gray-800">উৎসব ব্যবস্থাপনা</h2>
@@ -162,76 +182,150 @@ const EventManagement = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-6">
-          {events.map((event, index) => {
-            const startDate = new Date(event.startDate);
-            const endDate = new Date(event.endDate);
-            const status = getEventStatus(event.startDate, event.endDate);
+        {/* ✅ Active Events Section */}
+        <div className="mb-12">
+          <h3 className="text-xl font-semibold text-gray-800 mb-4">বর্তমান ও আসন্ন অনুষ্ঠানসমূহ</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {activeEvents.map((event, index) => {
+              const startDate = new Date(event.startDate);
+              const endDate = new Date(event.endDate);
+              const status = getEventStatus(event.startDate, event.endDate);
 
-            return (
-              <div
-                key={event.id}
-                className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col transform transition-all duration-300 hover:scale-102 hover:shadow-xl slide-up"
-                style={{
-                  animationDelay: `${index * 0.1}s`,
-                  opacity: 0,
-                  animation: `fadeIn 0.5s ease-out ${index * 0.1}s forwards`,
-                }}
-              >
-                <div className="relative group">
-                  <img
-                    src={event.imageUrl}
-                    alt={event.title}
-                    className="w-full h-48 object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                  <div className="absolute top-2 right-2">
-                    <span
-                      className={`px-3 py-1 text-sm font-semibold rounded-full ${
-                        status === 'আসন্ন'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : status === 'অনুষ্ঠান চলছে'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-200 text-gray-700'
-                      }`}
-                    >
-                      {status}
-                    </span>
+              return (
+                <div
+                  key={event.id}
+                  className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col transform transition-all duration-300 hover:scale-102 hover:shadow-xl slide-up"
+                  style={{
+                    animationDelay: `${index * 0.1}s`,
+                    opacity: 0,
+                    animation: `fadeIn 0.5s ease-out ${index * 0.1}s forwards`,
+                  }}
+                >
+                  <div className="relative group">
+                    <img
+                      src={event.imageUrl}
+                      alt={event.title}
+                      className="w-full h-48 object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                    <div className="absolute top-2 right-2">
+                      <span
+                        className={`px-3 py-1 text-sm font-semibold rounded-full ${
+                          status === 'আসন্ন'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : status === 'অনুষ্ঠান চলছে'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-200 text-gray-700'
+                        }`}
+                      >
+                        {status}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-4 flex flex-col flex-grow">
+                    <h3 className="text-lg font-medium text-gray-900">{event.title}</h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {startDate.toLocaleDateString('bn-BD', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })} - {endDate.toLocaleDateString('bn-BD', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </p>
+                    <p className="mt-2 text-sm text-gray-600 flex-grow">{event.description}</p>
+
+                    <div className="mt-4 flex justify-end space-x-2">
+                      <button
+                        onClick={() => handleEdit(event)}
+                        className="p-2 text-indigo-600 hover:text-indigo-900 transition-colors duration-200 hover:bg-indigo-50 rounded-full"
+                      >
+                        <PencilIcon className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => confirmDeleteEvent(event.id, event.imagePublicId)}
+                        className="p-2 text-red-600 hover:text-red-900 transition-colors duration-200 hover:bg-red-50 rounded-full"
+                      >
+                        <TrashIcon className="h-5 w-5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <div className="p-4 flex flex-col flex-grow">
-                  <h3 className="text-lg font-medium text-gray-900">{event.title}</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {startDate.toLocaleDateString('bn-BD', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })} - {endDate.toLocaleDateString('bn-BD', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
-                  </p>
-                  <p className="mt-2 text-sm text-gray-600 flex-grow">{event.description}</p>
-
-                  <div className="mt-4 flex justify-end space-x-2">
-                    <button
-                      onClick={() => handleEdit(event)}
-                      className="p-2 text-indigo-600 hover:text-indigo-900 transition-colors duration-200 hover:bg-indigo-50 rounded-full"
-                    >
-                      <PencilIcon className="h-5 w-5" />
-                    </button>
-                    <button
-                      onClick={() => confirmDeleteEvent(event.id, event.imagePublicId)}
-                      className="p-2 text-red-600 hover:text-red-900 transition-colors duration-200 hover:bg-red-50 rounded-full"
-                    >
-                      <TrashIcon className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+          {activeEvents.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-gray-500">কোনো সক্রিয় অনুষ্ঠান পাওয়া যায়নি</p>
+            </div>
+          )}
         </div>
+
+        {/* ✅ Event History Section */}
+        {pastEvents.length > 0 && (
+          <div className="mb-8">
+            <div className="border-t border-gray-200 pt-8">
+              <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                ইতিহাসের অনুষ্ঠানসমূহ ({pastEvents.length}টি)
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {pastEvents.map((event) => (
+                  <div 
+                    key={event.id}
+                    className="bg-gray-50 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden border border-gray-200"
+                  >
+                    <div className="relative">
+                      <img 
+                        src={event.imageUrl} 
+                        alt={event.title} 
+                        className="w-full h-32 object-cover"
+                      />
+                      <div className="absolute top-2 right-2">
+                        <span className="px-2 py-1 bg-red-500 text-white text-xs rounded-full">
+                          সম্পন্ন
+                        </span>
+                      </div>
+                      {/* ✅ Delete button for past events */}
+                      <div className="absolute top-2 left-2">
+                        <button
+                          onClick={() => confirmDeleteEvent(event.id, event.imagePublicId)}
+                          className="p-1.5 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors duration-200 shadow-sm"
+                          title="এই অনুষ্ঠান মুছুন"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="p-3">
+                      <h4 className="text-sm font-semibold text-gray-800 mb-1 line-clamp-2">
+                        {event.title}
+                      </h4>
+                      <p className="text-xs text-gray-600 mb-2 line-clamp-2">
+                        {event.description}
+                      </p>
+                      <div className="text-xs text-gray-500">
+                        <p className="mb-1">
+                          <strong>শুরু:</strong> {formatDate(event.startDate)}
+                        </p>
+                        {event.startDate !== event.endDate && (
+                          <p>
+                            <strong>শেষ:</strong> {formatDate(event.endDate)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
