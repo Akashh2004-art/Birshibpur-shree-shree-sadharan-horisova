@@ -1,7 +1,10 @@
 import { Request, Response } from 'express';
 import { Event } from '../models/eventModel';
+import User from '../models/userModel';
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
+import { sendEmailNotification } from '../utils/emailService';
+import { createEventNotification } from './notificationController';
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -36,7 +39,45 @@ export const createEvent = async (req: Request & { file?: Express.Multer.File },
       imagePublicId: result.public_id
     });
 
-    return res.status(201).json({ success: true, message: 'ইভেন্ট সফলভাবে তৈরি হয়েছে', data: event });
+    // Send email notification to all users about new event
+    try {
+      const users = await User.find({ email: { $exists: true, $ne: null } });
+      const emailCount = await sendEmailNotification(
+        users,
+        'নতুন ইভেন্ট যোগ করা হয়েছে',
+        `নতুন ইভেন্ট: ${title}`,
+        `
+        প্রিয় ভক্তগণ,
+        
+        আমাদের মন্দিরে একটি নতুন ইভেন্ট যোগ করা হয়েছে:
+        
+        ইভেন্টের নাম: ${title}
+        শুরুর তারিখ: ${new Date(startDate).toLocaleDateString('bn-BD')}
+        শেষের তারিখ: ${new Date(endDate).toLocaleDateString('bn-BD')}
+        বিবরণ: ${description}
+        
+        আরও তথ্যের জন্য আমাদের ওয়েবসাইট দেখুন।
+        
+        ধন্যবাদ,
+        মন্দির কমিটি
+        `
+      );
+      
+      // ✅ Create notification with email count
+      await createEventNotification(title, 'created', emailCount);
+      
+      console.log(`New event notification sent to ${emailCount} users`);
+    } catch (emailError) {
+      console.error('Error sending email notifications:', emailError);
+      // Create notification even if email fails
+      await createEventNotification(title, 'created', 0);
+    }
+
+    return res.status(201).json({ 
+      success: true, 
+      message: 'ইভেন্ট সফলভাবে তৈরি হয়েছে', 
+      data: event 
+    });
   } catch (error) {
     if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     return res.status(500).json({ success: false, error: 'সার্ভার এ একটি সমস্যা হয়েছে' });
@@ -90,7 +131,45 @@ export const updateEvent = async (req: Request & { file?: Express.Multer.File },
 
     await existingEvent.save();
 
-    return res.status(200).json({ success: true, message: 'ইভেন্ট আপডেট সফল হয়েছে', data: existingEvent });
+    // 🔥 MAIN FEATURE: Send email notification to all users about event update
+    try {
+      const users = await User.find({ email: { $exists: true, $ne: null } });
+      const emailCount = await sendEmailNotification(
+        users,
+        'ইভেন্ট আপডেট করা হয়েছে',
+        `ইভেন্ট আপডেট: ${title}`,
+        `
+        প্রিয় ভক্তগণ,
+        
+        আমাদের মন্দিরের একটি ইভেন্ট আপডেট করা হয়েছে:
+        
+        ইভেন্টের নাম: ${title}
+        শুরুর তারিখ: ${new Date(startDate).toLocaleDateString('bn-BD')}
+        শেষের তারিখ: ${new Date(endDate).toLocaleDateString('bn-BD')}
+        বিবরণ: ${description}
+        
+        নতুন তথ্য দেখার জন্য অনুগ্রহ করে আমাদের ওয়েবসাইট দেখুন।
+        
+        ধন্যবাদ,
+        মন্দির কমিটি
+        `
+      );
+      
+      // ✅ Create notification with email count
+      await createEventNotification(title, 'updated', emailCount);
+      
+      console.log(`Event update notification sent to ${emailCount} users`);
+    } catch (emailError) {
+      console.error('Error sending email notifications:', emailError);
+      // Create notification even if email fails
+      await createEventNotification(title, 'updated', 0);
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'ইভেন্ট আপডেট সফল হয়েছে', 
+      data: existingEvent 
+    });
   } catch (error) {
     if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     return res.status(500).json({ success: false, error: 'সার্ভার সমস্যা হয়েছে' });

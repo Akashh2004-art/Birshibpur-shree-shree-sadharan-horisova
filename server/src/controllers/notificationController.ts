@@ -45,6 +45,52 @@ export const markAllAsRead = async (req: Request, res: Response) => {
     });
   }
 };
+
+// ✅ NEW: Create event notification with email count tracking
+export const createEventNotification = async (
+  eventTitle: string, 
+  action: 'created' | 'updated' | 'deleted',
+  emailCount: number = 0
+) => {
+  try {
+    let message = '';
+    
+    switch (action) {
+      case 'created':
+        message = `নতুন ইভেন্ট তৈরি হয়েছে: "${eventTitle}" | ${emailCount} জন ব্যবহারকারীকে ইমেইল পাঠানো হয়েছে`;
+        break;
+      case 'updated':
+        message = `ইভেন্ট আপডেট হয়েছে: "${eventTitle}" | ${emailCount} জন ব্যবহারকারীকে ইমেইল পাঠানো হয়েছে`;
+        break;
+      case 'deleted':
+        message = `ইভেন্ট মুছে ফেলা হয়েছে: "${eventTitle}"`;
+        break;
+      default:
+        message = `ইভেন্ট "${eventTitle}" এ পরিবর্তন হয়েছে`;
+    }
+
+    const notification = new Notification({
+      type: 'event',
+      message: message,
+      read: false,
+      emailCount: emailCount, // Track how many emails were sent
+      eventTitle: eventTitle,
+      action: action
+    });
+    
+    await notification.save();
+    
+    // Socket.IO দিয়ে রিয়েল-টাইম নোটিফিকেশন পাঠান
+    io.emit('newNotification', notification);
+    
+    console.log(`Event notification created: ${message}`);
+    return notification;
+  } catch (error) {
+    console.error('Error creating event notification:', error);
+    throw error;
+  }
+};
+
 // createSignupNotification ফাংশন যদি না থাকে বা সঠিকভাবে কাজ না করে
 // createSignupNotification ফাংশন আপডেট করুন
 export const createSignupNotification = async (identifier: string) => {
@@ -82,5 +128,51 @@ export const createSignupNotification = async (identifier: string) => {
   } catch (error) {
     console.error('Error creating signup notification:', error);
     throw error;
+  }
+};
+
+// ✅ NEW: Get email statistics
+export const getEmailStats = async (req: Request, res: Response) => {
+  try {
+    // Total users with email - FIXED: Using $and operator to combine conditions
+    const totalUsersWithEmail = await User.countDocuments({ 
+      $and: [
+        { email: { $exists: true } },
+        { email: { $ne: null } },
+        { email: { $ne: '' } }
+      ]
+    });
+    
+    // Total users without email
+    const totalUsersWithoutEmail = await User.countDocuments({ 
+      $or: [
+        { email: { $exists: false } },
+        { email: null },
+        { email: '' }
+      ]
+    });
+    
+    // Recent email notifications
+    const recentEmailNotifications = await Notification.find({ 
+      type: 'event',
+      message: { $regex: 'ইমেইল পাঠানো হয়েছে' }
+    }).sort({ createdAt: -1 }).limit(5);
+    
+    const stats = {
+      totalUsersWithEmail,
+      totalUsersWithoutEmail,
+      totalUsers: totalUsersWithEmail + totalUsersWithoutEmail,
+      recentEmailNotifications: recentEmailNotifications.map(notif => ({
+        id: notif._id,
+        message: notif.message,
+        createdAt: notif.createdAt,
+        emailCount: notif.emailCount || 0
+      }))
+    };
+    
+    res.status(200).json({ success: true, data: stats });
+  } catch (error) {
+    console.error('Error fetching email stats:', error);
+    res.status(500).json({ success: false, error: 'ইমেইল পরিসংখ্যান লোড করতে সমস্যা হয়েছে' });
   }
 };
