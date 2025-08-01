@@ -8,11 +8,12 @@ export interface IUser extends Document {
   firebaseUID?: string;
   authProvider: 'email' | 'phone' | 'google';
   isVerified: boolean;
-  religion?: string;
+  religion?: string; // Optional field, no default
   otp?: string; // OTP সংরক্ষণের জন্য
   otpExpires?: Date; // OTP মেয়াদ শেষ হওয়ার সময়
-  role: 'admin' | 'user'; // নতুনভাবে ভূমিকা যোগ
-  status: 'active' | 'inactive'; // নতুনভাবে স্ট্যাটাস যোগ
+  role?: 'admin' | 'user'; // Optional field, no default
+  status?: 'active' | 'inactive'; // Optional field, no default
+  photoURL?: string; // For Google users
 }
 
 const userSchema = new Schema<IUser>(
@@ -49,12 +50,7 @@ const userSchema = new Schema<IUser>(
     },
     isVerified: {
       type: Boolean,
-      default: false,
-    },
-    religion: {
-      type: String,
-      trim: true,
-      default: 'Hindu',
+      default: false, // This is okay to keep as default
     },
     otp: {
       type: String,
@@ -62,21 +58,23 @@ const userSchema = new Schema<IUser>(
     otpExpires: {
       type: Date,
     },
-    role: {
+    photoURL: {
       type: String,
-      enum: ['admin', 'user'],
-      default: 'user', // ডিফল্ট ভূমিকা ইউজার
-    },
-    status: {
-      type: String,
-      enum: ['active', 'inactive'],
-      default: 'active', // ডিফল্ট স্ট্যাটাস অ্যাকটিভ
+      trim: true,
     },
   },
   {
     timestamps: true,
   }
 );
+
+// Indexes for better performance
+userSchema.index({ email: 1 });
+userSchema.index({ phone: 1 });
+userSchema.index({ firebaseUID: 1 });
+userSchema.index({ authProvider: 1 });
+userSchema.index({ role: 1 });
+userSchema.index({ status: 1 });
 
 const User = mongoose.model<IUser>('User', userSchema);
 

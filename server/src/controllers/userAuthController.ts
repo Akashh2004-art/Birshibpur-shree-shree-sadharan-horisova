@@ -46,7 +46,7 @@ export const checkPhoneNumber = async (req: Request, res: Response) => {
 // ✅ Validate Phone Number (same as checkPhoneNumber for consistency)
 export const validatePhoneNumber = checkPhoneNumber;
 
-// ✅ Complete Signup with Phone Number
+// 🚀 UPDATED: Complete Signup with Phone Number - Remove default fields
 export const completeSignup = async (req: Request, res: Response) => {
   try {
     const { phone, password } = req.body;
@@ -58,11 +58,12 @@ export const completeSignup = async (req: Request, res: Response) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // 🚀 FIXED: Only essential fields, no default role/status/religion
     const newUser = new User({
       phone: `+91${phone}`,
       password: hashedPassword,
-      role: 'user', // ডিফল্ট ভূমিকা ইউজার
-      status: 'active', // ডিফল্ট স্ট্যাটাস অ্যাকটিভ
+      authProvider: 'phone',
+      isVerified: false
     });
 
     await newUser.save();
@@ -79,7 +80,7 @@ export const completeSignup = async (req: Request, res: Response) => {
   }
 };
 
-// ✅ Google Sign Up / Sign In
+// 🚀 UPDATED: Google Sign Up / Sign In - Remove default fields
 export const googleSignUp = async (
   req: Request,
   res: Response
@@ -116,8 +117,6 @@ export const googleSignUp = async (
           name: user.name,
           email: user.email,
           phone: user.phone || '',
-          role: user.role,
-          status: user.status,
         },
         token,
         needsPassword: !user.password,
@@ -142,7 +141,7 @@ export const googleSignUp = async (
   }
 };
 
-// ✅ Complete Google Sign Up
+// 🚀 UPDATED: Complete Google Sign Up - Remove default fields
 export const completeGoogleSignUp = async (
   req: Request,
   res: Response
@@ -165,6 +164,8 @@ export const completeGoogleSignUp = async (
     }
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
+    
+    // 🚀 FIXED: Only essential fields, no default role/status/religion
     const newUser = await User.create({
       name: name || email.split("@")[0],
       email,
@@ -173,8 +174,7 @@ export const completeGoogleSignUp = async (
       phone,
       password: hashedPassword,
       authProvider: "google",
-      role: 'user', // ডিফল্ট ভূমিকা ইউজার
-      status: 'active', // ডিফল্ট স্ট্যাটাস অ্যাকটিভ
+      isVerified: true
     });
     
     // নোটিফিকেশন তৈরি করুন
@@ -314,7 +314,6 @@ export const login = async (req: Request, res: Response) => {
         email: user.email,
         phone: user.phone,
         name: user.name,
-        role: user.role,
       },
     });
   } catch (error) {
@@ -352,6 +351,6 @@ export const getAllUsers = async (req: Request, res: Response) => {
       .sort({ createdAt: -1 }); // সাম্প্রতিক ইউজার প্রথমে দেখানো হবে
     res.status(200).json(users);
   } catch (error) {
-    res.status(500).json({ success: false, message: 'সার্�ভার ত্রুটি', error });
+    res.status(500).json({ success: false, message: 'সার্ভার ত্রুটি', error });
   }
 };
