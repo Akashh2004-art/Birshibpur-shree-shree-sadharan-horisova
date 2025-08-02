@@ -94,7 +94,7 @@ export const setNewPassword = (emailOrPhone: string, otp: string, password: stri
   });
 };
 
-// ✅ NEW: Event API functions
+// ✅ Event API functions
 export const getEventsForHome = () => {
   return request('/events/home', { method: 'GET' });
 };
@@ -111,6 +111,34 @@ export const getPastEvents = () => {
   return request('/events/history', { method: 'GET' });
 };
 
+// ✅ NEW: Gallery API functions
+export const getAllGallery = (params?: {
+  category?: string;
+  type?: string;
+  page?: number;
+  limit?: number;
+}) => {
+  // Build query string from params
+  const queryString = params ? '?' + new URLSearchParams(
+    Object.entries(params)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [key, String(value)])
+  ).toString() : '';
+  
+  return request(`/gallery${queryString}`, { method: 'GET' });
+};
+
+export const getGalleryItem = (id: string) => {
+  if (!id) {
+    throw new Error('গ্যালারি আইটেম ID দরকার');
+  }
+  return request(`/gallery/${id}`, { method: 'GET' });
+};
+
+export const getGalleryStats = () => {
+  return request('/gallery/stats', { method: 'GET' });
+};
+
 export const api = {
   get: (endpoint: string, config: RequestConfig = {}) => 
     request(endpoint, { ...config, method: 'GET' }),
@@ -122,6 +150,13 @@ export const api = {
     request(endpoint, { method: 'DELETE', ...config }),
 };
 
+// ✅ Gallery API object for easier usage
+export const galleryApi = {
+  getAll: getAllGallery,
+  getOne: getGalleryItem,
+  getStats: getGalleryStats,
+};
+
 export default { 
   userLogin, 
   api, 
@@ -131,5 +166,10 @@ export default {
   getEventsForHome,
   getAllEvents,
   getUpcomingEvents,
-  getPastEvents
+  getPastEvents,
+  // Gallery functions
+  getAllGallery,
+  getGalleryItem,
+  getGalleryStats,
+  galleryApi
 };

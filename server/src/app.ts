@@ -12,8 +12,9 @@ import passwordRoutes from "./routes/passwordRoutes";
 import userAuthRoutes from "./routes/userAuthRoutes";
 import userPasswordRoutes from "./routes/userPasswordRoutes";
 import notificationRoutes from "./routes/notificationRoutes";
-import dashboardRoutes from "./routes/dashboardRoutes"; // ড্যাশবোর্ড রাউট ইম্পোর্ট করা হয়েছে
-import eventRoutes from "./routes/eventRoutes"; // Add this import
+import dashboardRoutes from "./routes/dashboardRoutes";
+import eventRoutes from "./routes/eventRoutes";
+import galleryRoutes from "./routes/galleryRoutes"; // ✅ Gallery routes import করা হয়েছে
 
 dotenv.config();
 
@@ -21,6 +22,12 @@ dotenv.config();
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Create gallery uploads directory
+const galleryUploadDir = path.join(__dirname, 'uploads/gallery');
+if (!fs.existsSync(galleryUploadDir)) {
+    fs.mkdirSync(galleryUploadDir, { recursive: true });
 }
 
 const app: Application = express();
@@ -98,12 +105,13 @@ const startServer = async () => {
     app.use("/api/user", userPasswordRoutes);
     app.use("/api/notifications", notificationRoutes);
     app.use("/api/dashboard", dashboardRoutes); 
-    app.use("/api/user", userAuthRoutes);
-    app.use("/api/events", eventRoutes); 
+    app.use("/api/events", eventRoutes);
+    app.use("/api/gallery", galleryRoutes); // ✅ Gallery routes register করা হয়েছে
 
     if (process.env.NODE_ENV === "development") {
       app._router.stack.forEach((r: any) => {
         if (r.route && r.route.path) {
+          console.log(`📍 Route: ${Object.keys(r.route.methods)} ${r.route.path}`);
         }
       });
     }
