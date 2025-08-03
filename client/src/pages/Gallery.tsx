@@ -35,6 +35,8 @@ const Gallery = () => {
 
   // Fetch gallery data from API
   useEffect(() => {
+    window.scrollTo(0, 0); // 🔼 scroll to top
+
     const fetchGalleryData = async () => {
       try {
         setLoading(true);
@@ -100,26 +102,30 @@ const Gallery = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
-      {/* Hero Section */}
-      <div className="relative bg-gradient-to-r from-orange-500 to-red-600 text-white py-20 overflow-hidden">
-        <div className="absolute inset-0 bg-black/10"></div>
+      {/* Hero Section with Animation */}
+      <div className="relative bg-gradient-to-r from-orange-600 via-red-500 to-pink-500 text-white overflow-hidden">
+        <div className="absolute inset-0 bg-black opacity-20"></div>
         <div className="absolute inset-0">
-          <div className="absolute top-10 left-10 w-32 h-32 bg-white/10 rounded-full blur-xl"></div>
-          <div className="absolute bottom-10 right-20 w-40 h-40 bg-white/10 rounded-full blur-xl"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-60 h-60 bg-white/5 rounded-full blur-2xl"></div>
+          <div className="absolute top-10 left-10 w-64 h-64 bg-white opacity-10 rounded-full animate-pulse"></div>
+          <div className="absolute bottom-10 right-10 w-48 h-48 bg-yellow-300 opacity-20 rounded-full animate-bounce"></div>
+          <div className="absolute top-1/2 left-1/3 w-32 h-32 bg-pink-300 opacity-15 rounded-full animate-ping"></div>
         </div>
-        <div className="container mx-auto px-4 relative z-10">
+        
+        <div className="relative container mx-auto px-4 py-20">
           <div className="text-center">
-            <div className="inline-block p-4 bg-white/20 backdrop-blur-sm rounded-2xl mb-6">
-              <span className="text-5xl">📸</span>
-            </div>
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 tracking-tight">
+            <h1 className="text-5xl md:text-7xl font-bold mb-6 animate-fadeInUp">
               গ্যালারি
             </h1>
-            <p className="text-xl md:text-2xl max-w-3xl mx-auto leading-relaxed">
+            <div className="w-24 h-1 bg-white mx-auto mb-6 rounded-full"></div>
+            <p className="text-xl md:text-2xl max-w-3xl mx-auto leading-relaxed animate-fadeInUp animation-delay-300">
               মন্দিরের বিভিন্ন অনুষ্ঠান ও উৎসবের স্মৃতিচিত্র
             </p>
-            <div className="mt-8 flex justify-center">
+            
+            {/* Decorative elements */}
+            <div className="flex justify-center mt-8 space-x-4">
+              <div className="w-3 h-3 bg-white rounded-full animate-bounce"></div>
+              <div className="w-3 h-3 bg-white rounded-full animate-bounce animation-delay-100"></div>
+              <div className="w-3 h-3 bg-white rounded-full animate-bounce animation-delay-200"></div>
             </div>
           </div>
         </div>
@@ -328,20 +334,51 @@ const Gallery = () => {
       )}
 
       <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(50px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
         }
+        
         @keyframes scaleIn {
           from { opacity: 0; transform: scale(0.9); }
           to { opacity: 1; transform: scale(1); }
         }
+        
+        .animate-fadeInUp {
+          animation: fadeInUp 0.8s ease-out;
+        }
+        
         .animate-fadeIn {
           animation: fadeIn 0.3s ease-out;
         }
+        
         .animate-scaleIn {
           animation: scaleIn 0.3s ease-out;
         }
+        
+        .animation-delay-100 {
+          animation-delay: 0.1s;
+        }
+        
+        .animation-delay-200 {
+          animation-delay: 0.2s;
+        }
+        
+        .animation-delay-300 {
+          animation-delay: 0.3s;
+        }
+        
         .line-clamp-2 {
           display: -webkit-box;
           -webkit-line-clamp: 2;
