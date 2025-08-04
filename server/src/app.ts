@@ -16,6 +16,7 @@ import dashboardRoutes from "./routes/dashboardRoutes";
 import eventRoutes from "./routes/eventRoutes";
 import galleryRoutes from "./routes/galleryRoutes"; // ✅ Gallery routes import করা হয়েছে
 
+
 dotenv.config();
 
 // Create uploads directory if it doesn't exist
@@ -106,7 +107,8 @@ const startServer = async () => {
     app.use("/api/notifications", notificationRoutes);
     app.use("/api/dashboard", dashboardRoutes); 
     app.use("/api/events", eventRoutes);
-    app.use("/api/gallery", galleryRoutes); // ✅ Gallery routes register করা হয়েছে
+    app.use("/api/gallery", galleryRoutes);
+
 
     if (process.env.NODE_ENV === "development") {
       app._router.stack.forEach((r: any) => {

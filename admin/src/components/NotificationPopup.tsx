@@ -49,40 +49,48 @@ const NotificationPopup: React.FC = () => {
     // Listen for new notifications
     newSocket.on('newNotification', (notification: Notification) => {
       console.log('New notification received:', notification);
-      setNotifications(prev => [notification, ...prev]);
-      setShowPopup(true);
+      // নতুন notification যদি unread হয় তাহলে শুধুমাত্র তখনই add করা
+      if (!notification.read) {
+        setNotifications(prev => [notification, ...prev]);
+        setShowPopup(true);
+      }
     });
   
-  // Add this new listener
-  newSocket.on('notificationsUpdated', () => {
-    console.log('Notifications updated event received');
-    fetchNotifications();
-  });
-  // Add click outside handler
-  const handleClickOutside = (event: MouseEvent) => {
-    if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
-      setShowPopup(false);
-    }
-  };
-  
-  document.addEventListener('mousedown', handleClickOutside);
-  
-  return () => {
-    newSocket.disconnect();
-    document.removeEventListener('mousedown', handleClickOutside);
-    window.removeEventListener('resize', checkIfMobile);
-  };
-}, []);
+    // Add this new listener
+    newSocket.on('notificationsUpdated', () => {
+      console.log('Notifications updated event received');
+      fetchNotifications();
+    });
+    
+    // Add click outside handler
+    const handleClickOutside = (event: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
+        setShowPopup(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    return () => {
+      newSocket.disconnect();
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', checkIfMobile);
+    };
+  }, []);
+
   const fetchNotifications = async () => {
     try {
       console.log('Fetching notifications...');
-      const response = await axios.get('/api/notifications');
+      // ✅ Fixed: Remove extra /api prefix
+      const response = await axios.get('/notifications');
       console.log('Notifications received:', response.data);
-      setNotifications(response.data);
+      
+      // শুধুমাত্র unread notifications state এ রাখা
+      const unreadNotifications = response.data.filter((notif: Notification) => !notif.read);
+      setNotifications(unreadNotifications);
       
       // Show popup if there are unread notifications
-      const hasUnread = response.data.some((notif: Notification) => !notif.read);
-      if (hasUnread) {
+      if (unreadNotifications.length > 0) {
         setShowPopup(true);
       }
     } catch (error) {
@@ -92,10 +100,17 @@ const NotificationPopup: React.FC = () => {
 
   const markAsRead = async (id: string) => {
     try {
-      await axios.put(`/api/notifications/${id}/read`);
-      setNotifications(notifications.map(notif => 
-        notif._id === id ? { ...notif, read: true } : notif
-      ));
+      // ✅ Fixed: Remove extra /api prefix
+      await axios.put(`/notifications/${id}/read`);
+      
+      // State থেকে notification টি remove করা (কারণ এখন এটি read)
+      setNotifications(prev => prev.filter(notif => notif._id !== id));
+      
+      // যদি আর কোন unread notification না থাকে তাহলে popup close করা
+      const remainingUnread = notifications.filter(notif => notif._id !== id);
+      if (remainingUnread.length === 0) {
+        setShowPopup(false);
+      }
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -105,18 +120,20 @@ const NotificationPopup: React.FC = () => {
     try {
       console.log("📢 Sending request to mark all as read...");
       
+      // Backend এ সব notifications read mark করা
       await axios.put("/notifications/mark-all-read");
-  
-      // State Update: Notification list খালি করে দিচ্ছি
+      
+      // Frontend state clear করা (কারণ সব read হয়ে গেছে)
       setNotifications([]);
+      
+      // Popup close করা কারণ সব read হয়ে গেছে
+      setShowPopup(false);
   
-      console.log("✅ All notifications marked as read and removed from UI!");
+      console.log("✅ All notifications marked as read!");
     } catch (error) {
       console.error("❌ Error marking all notifications as read:", error);
     }
   };
-  
-
   
   const unreadCount = notifications.filter(notif => !notif.read).length;
   
@@ -137,20 +154,27 @@ const NotificationPopup: React.FC = () => {
       
       <div className="divide-y divide-gray-100">
         {notifications.length === 0 ? (
-          <div className="p-4 text-center text-gray-500">No notifications</div>
+          <div className="p-4 text-center text-gray-500">কোন নোটিফিকেশন নেই</div>
         ) : (
-          notifications.map(notification => (
-            <div 
-              key={notification._id} 
-              className={`p-4 hover:bg-gray-50 ${!notification.read ? 'bg-blue-50' : ''}`}
-              onClick={() => markAsRead(notification._id)}
-            >
-              <p className="text-sm font-medium">{notification.message}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                {new Date(notification.createdAt).toLocaleString()}
-              </p>
-            </div>
-          ))
+          // শুধুমাত্র unread notifications show করা
+          notifications.filter(notif => !notif.read).length === 0 ? (
+            <div className="p-4 text-center text-gray-500">সব নোটিফিকেশন পড়া হয়েছে</div>
+          ) : (
+            notifications
+              .filter(notif => !notif.read) // শুধু unread notifications
+              .map(notification => (
+                <div 
+                  key={notification._id} 
+                  className="p-4 hover:bg-gray-50 cursor-pointer bg-blue-50"
+                  onClick={() => markAsRead(notification._id)}
+                >
+                  <p className="text-sm font-medium">{notification.message}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {new Date(notification.createdAt).toLocaleString()}
+                  </p>
+                </div>
+              ))
+          )
         )}
       </div>
     </>
