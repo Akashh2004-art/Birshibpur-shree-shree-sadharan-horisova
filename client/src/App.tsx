@@ -8,11 +8,12 @@ import Signup from "./pages/Signup";
 import Events from "./pages/Events";
 import Gallery from "./pages/Gallery";
 import Booking from "./pages/Booking";
-import Donations from "./pages/Donations";
+// import Donations from "./pages/Donations"; // Original donations page commented out
 import About from "./pages/About";
 import ForgotPassword from "./pages/ForgotPassword";
 import SetPassword from "./pages/SetPassword";
 import ResetPassword from "./pages/ResetPassword";
+import NotFound from "./components/NotFound"; // Import NotFound component
 
 const App = () => {
   return (
@@ -32,8 +33,14 @@ const App = () => {
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/set-password" element={<SetPassword />} />
               <Route path="/booking" element={<Booking />} />
-              <Route path="/donations" element={<Donations />} />
+              
+              {/* Donations route now shows NotFound (Coming Soon) page */}
+              <Route path="/donations" element={<NotFound />} />
+              
               <Route path="/reset-password" element={<ResetPassword />} />
+              
+              {/* Catch all unknown routes */}
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
           <Footer />

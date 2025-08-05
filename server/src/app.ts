@@ -14,8 +14,7 @@ import userPasswordRoutes from "./routes/userPasswordRoutes";
 import notificationRoutes from "./routes/notificationRoutes";
 import dashboardRoutes from "./routes/dashboardRoutes";
 import eventRoutes from "./routes/eventRoutes";
-import galleryRoutes from "./routes/galleryRoutes"; // ✅ Gallery routes import করা হয়েছে
-
+import galleryRoutes from "./routes/galleryRoutes"; 
 
 dotenv.config();
 
@@ -108,6 +107,7 @@ const startServer = async () => {
     app.use("/api/dashboard", dashboardRoutes); 
     app.use("/api/events", eventRoutes);
     app.use("/api/gallery", galleryRoutes);
+  
 
 
     if (process.env.NODE_ENV === "development") {
