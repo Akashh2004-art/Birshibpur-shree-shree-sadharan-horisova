@@ -1,11 +1,15 @@
 import express, { Application, Request, Response, NextFunction } from "express";
 import cors from "cors";
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import http from "http";
+import { createServer } from "http";
 import { Server } from "socket.io";
 import path from 'path';
 import fs from 'fs';
+
+// Import routes
 import authRoutes from "./routes/authRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import passwordRoutes from "./routes/passwordRoutes";
@@ -15,73 +19,109 @@ import notificationRoutes from "./routes/notificationRoutes";
 import dashboardRoutes from "./routes/dashboardRoutes";
 import eventRoutes from "./routes/eventRoutes";
 import galleryRoutes from "./routes/galleryRoutes"; 
+import bookingRoutes from './routes/bookingRoutes';
 
 dotenv.config();
 
-// Create uploads directory if it doesn't exist
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
+// Create required directories
+const createRequiredDirs = () => {
+  const dirs = [
+    path.join(__dirname, 'uploads'),
+    path.join(__dirname, 'uploads/gallery'),
+    path.join(__dirname, 'uploads/events')
+  ];
+  
+  dirs.forEach(dir => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  });
+};
 
-// Create gallery uploads directory
-const galleryUploadDir = path.join(__dirname, 'uploads/gallery');
-if (!fs.existsSync(galleryUploadDir)) {
-    fs.mkdirSync(galleryUploadDir, { recursive: true });
-}
+createRequiredDirs();
 
 const app: Application = express();
-const server = http.createServer(app);
+const server = createServer(app);
+
+// Socket.io setup with security options
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:5100"], // Admin and User frontends
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    credentials: true,
+    origin: [
+      process.env.CLIENT_URL || "http://localhost:5173",
+      process.env.ADMIN_URL || "http://localhost:5100"
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true
   },
+  pingTimeout: 60000,
+  maxHttpBufferSize: 1e6 // 1 MB
 });
 
-// Export io to be used in other files
 export { io };
 
-// Add this to serve uploaded files
-app.use('/uploads', express.static('uploads'));
+// Security middleware
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false
+}));
 
-// MongoDB Connection
-const connectDB = async () => {
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
+  message: {
+    error: 'অনেক বেশি রিকোয়েস্ট করা হয়েছে, কিছুক্ষণ পর চেষ্টা করুন।',
+    retryAfter: 15
+  }
+});
+
+app.use('/api', limiter);
+
+// MongoDB Connection with retry logic
+const connectDB = async (retries = 5) => {
   try {
-    await mongoose.connect(
-      process.env.MONGO_URI ||
-        "mongodb+srv://akashsaha0751:US1VPMcJTKy3FSYS@cluster0.iz9uj.mongodb.net/temple_management"
-    );
+    const uri = process.env.MONGODB_URI;
+    if (!uri) {
+      throw new Error('MONGODB_URI is not defined in environment variables');
+    }
+    
+    await mongoose.connect(uri);
     console.log("✅ MongoDB Connected Successfully!");
   } catch (error) {
     console.error("❌ MongoDB connection error:", error);
-    process.exit(1);
+    if (retries > 0) {
+      console.log(`Retrying connection... (${retries} attempts left)`);
+      setTimeout(() => connectDB(retries - 1), 5000);
+    } else {
+      process.exit(1);
+    }
   }
 };
 
-// Start the server
+// Start server function
 const startServer = async () => {
   try {
     await connectDB();
 
-    // Middlewares
-    app.use(
-      cors({
-        origin: [
-          "http://localhost:5173", // Admin frontend
-          "http://localhost:5100", // User frontend
-        ],
-        credentials: true,
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
-      })
-    );
+    // CORS configuration
+    app.use(cors({
+      origin: [
+        process.env.CLIENT_URL || "http://localhost:5173",
+        process.env.ADMIN_URL || "http://localhost:5100"
+      ],
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization"]
+    }));
 
-    app.use(express.json()); // JSON ডাটা পার্স করা
-    app.use(express.urlencoded({ extended: true }));
+    // Body parsing with limits
+    app.use(express.json({ limit: '10mb' }));
+    app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-    // Socket.io setup
+    // Serve static files
+    app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+    // Socket.io connection handling
     io.on("connection", (socket) => {
 
       socket.on("disconnect", () => {
@@ -94,22 +134,23 @@ const startServer = async () => {
         status: "healthy",
         timestamp: new Date().toISOString(),
         environment: process.env.NODE_ENV || "development",
+        socketConnections: io.engine.clientsCount
       });
     });
 
-    // Routes
+    // API Routes
     app.use("/api/user", userAuthRoutes);
     app.use("/api/auth", authRoutes);
     app.use("/api/admin", adminRoutes);
     app.use("/api/password", passwordRoutes);
     app.use("/api/user", userPasswordRoutes);
     app.use("/api/notifications", notificationRoutes);
-    app.use("/api/dashboard", dashboardRoutes); 
+    app.use("/api/dashboard", dashboardRoutes);
     app.use("/api/events", eventRoutes);
     app.use("/api/gallery", galleryRoutes);
-  
+    app.use('/api/bookings', bookingRoutes);
 
-
+    // Log routes in development
     if (process.env.NODE_ENV === "development") {
       app._router.stack.forEach((r: any) => {
         if (r.route && r.route.path) {
@@ -122,7 +163,7 @@ const startServer = async () => {
     app.use((req: Request, res: Response) => {
       res.status(404).json({
         success: false,
-        message: "রিকোয়েস্টকৃত পাথটি খুঁজে পাওয়া যায়নি",
+        message: "রিকোয়েস্টকৃত পাথটি খুঁজে পাওয়া যায়নি"
       });
     });
 
@@ -131,25 +172,26 @@ const startServer = async () => {
       console.error("❌ Error:", {
         message: err.message,
         stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       });
 
       res.status(500).json({
         success: false,
         message: "অভ্যন্তরীণ সার্ভার ত্রুটি",
-        error: process.env.NODE_ENV === "development" ? err.message : undefined,
+        error: process.env.NODE_ENV === "development" ? err.message : undefined
       });
     });
 
-    // Start server with http server instead of express app
+    // Start server
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => {
       console.log(`
 🚀 Server is running!
-📱 Admin Frontend: http://localhost:5173
-👥 User Frontend: http://localhost:5100
+📱 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}
+👑 Admin URL: ${process.env.ADMIN_URL || 'http://localhost:5100'}
 🔌 API Server: http://localhost:${PORT}
 ⏰ Started at: ${new Date().toLocaleString()}
+🌍 Environment: ${process.env.NODE_ENV || 'development'}
       `);
     });
   } catch (error) {
@@ -157,6 +199,35 @@ const startServer = async () => {
     process.exit(1);
   }
 };
+
+// Graceful shutdown handlers
+process.on('SIGTERM', () => {
+  console.log('⚠️ SIGTERM received, shutting down gracefully');
+  server.close(async () => {
+    try {
+      await mongoose.connection.close();
+      console.log('✅ MongoDB connection closed');
+      process.exit(0);
+    } catch (err) {
+      console.error('❌ Error closing MongoDB connection:', err);
+      process.exit(1);
+    }
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('⚠️ SIGINT received, shutting down gracefully');
+  server.close(async () => {
+    try {
+      await mongoose.connection.close();
+      console.log('✅ MongoDB connection closed');
+      process.exit(0);
+    } catch (err) {
+      console.error('❌ Error closing MongoDB connection:', err);
+      process.exit(1);
+    }
+  });
+});
 
 startServer();
 export default app;

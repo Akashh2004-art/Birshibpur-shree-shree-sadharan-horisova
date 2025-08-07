@@ -34,8 +34,8 @@ const Navbar = () => {
   }, [isOpen]);
 
   return (
-    <nav className="bg-white shadow-lg">
-      <div className="max-w7xl mx-auto px-4"> {/* max-w7xl -> max-w-7xl সংশোধন */}
+    <nav className="bg-white shadow-lg sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Left side - Temple Name with custom Bengali font */}
           <Link to="/" className="flex items-center">

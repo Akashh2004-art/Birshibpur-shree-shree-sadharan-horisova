@@ -225,8 +225,8 @@ const createEmailTemplate = (title: string, message: string): string => {
   `;
 };
 
-// Send individual email
-export const sendSingleEmail = async (
+// ✅ FIXED: Export sendEmail function (this was missing!)
+export const sendEmail = async (
   email: string,
   subject: string,
   message: string
@@ -254,6 +254,9 @@ export const sendSingleEmail = async (
     return false;
   }
 };
+
+// Send individual email (alias for backward compatibility)
+export const sendSingleEmail = sendEmail;
 
 // Test email connection
 export const testEmailConnection = async (): Promise<boolean> => {

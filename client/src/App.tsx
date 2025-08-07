@@ -1,5 +1,6 @@
-import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { BookingProvider } from "./context/BookingContext"; // Add this import
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
@@ -19,32 +20,34 @@ const App = () => {
   return (
     <Router>
       <AuthProvider>
-        <div className="flex flex-col min-h-screen">
-          <Navbar />
-          <main className="flex-grow">
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={<Home />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/events" element={<Events />} />
-              <Route path="/gallery" element={<Gallery />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/set-password" element={<SetPassword />} />
-              <Route path="/booking" element={<Booking />} />
-              
-              {/* Donations route now shows NotFound (Coming Soon) page */}
-              <Route path="/donations" element={<NotFound />} />
-              
-              <Route path="/reset-password" element={<ResetPassword />} />
-              
-              {/* Catch all unknown routes */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </main>
-          <Footer />
-        </div>
+        <BookingProvider> {/* Add this wrapper */}
+          <div className="flex flex-col min-h-screen">
+            <Navbar />
+            <main className="flex-grow">
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/" element={<Home />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/events" element={<Events />} />
+                <Route path="/gallery" element={<Gallery />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/set-password" element={<SetPassword />} />
+                <Route path="/booking" element={<Booking />} />
+                
+                {/* Donations route now shows NotFound (Coming Soon) page */}
+                <Route path="/donations" element={<NotFound />} />
+                
+                <Route path="/reset-password" element={<ResetPassword />} />
+                
+                {/* Catch all unknown routes */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </main>
+            <Footer />
+          </div>
+        </BookingProvider>
       </AuthProvider>
     </Router>
   );

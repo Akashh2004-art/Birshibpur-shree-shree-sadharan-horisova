@@ -36,7 +36,6 @@ const NotificationPopup: React.FC = () => {
     
     // Debug socket connection
     newSocket.on('connect', () => {
-      console.log('Socket connected successfully');
     });
     
     newSocket.on('connect_error', (error) => {
@@ -83,7 +82,6 @@ const NotificationPopup: React.FC = () => {
       console.log('Fetching notifications...');
       // ✅ Fixed: Remove extra /api prefix
       const response = await axios.get('/notifications');
-      console.log('Notifications received:', response.data);
       
       // শুধুমাত্র unread notifications state এ রাখা
       const unreadNotifications = response.data.filter((notif: Notification) => !notif.read);

@@ -7,6 +7,8 @@ interface AuthenticatedRequest extends Request {
     email: string;
     name: string;
     uid: string;
+    id?: string;
+    _id?: string;
     isAdmin?: boolean;
   };
 }
@@ -68,12 +70,55 @@ export const authenticateJWT = (
     req.user = {
       email: decoded.email,
       uid: decoded.id,
+      id: decoded.id,
       name: '' // You might want to fetch this from your database
     };
     next();
   } catch (err) {
     console.log('❌ JWT Verification Failed:', err);
     return res.status(403).json({ success: false, message: 'Invalid token' });
+  }
+};
+
+// ✅ FIXED: Export authenticateToken function (this was missing!)
+export const authenticateToken = (
+  req: AuthenticatedRequest, 
+  res: Response, 
+  next: NextFunction
+) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+
+  if (!token) {
+    return res.status(401).json({ 
+      success: false, 
+      message: 'Access token is required' 
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { 
+      id: string; 
+      email: string; 
+      role?: string;
+    };
+    
+    req.user = {
+      email: decoded.email,
+      uid: decoded.id,
+      id: decoded.id,
+      _id: decoded.id, // For MongoDB compatibility
+      name: '',
+      isAdmin: decoded.role === 'admin'
+    };
+    
+    next();
+  } catch (err) {
+    console.log('❌ Token Verification Failed:', err);
+    return res.status(403).json({ 
+      success: false, 
+      message: 'Invalid or expired token' 
+    });
   }
 };
 
@@ -103,10 +148,18 @@ export const authenticateAdmin = async (
     }
 
     // Add user from payload to request
-    req.user = decoded;
+    req.user = {
+      ...decoded,
+      id: decoded.id,
+      _id: decoded.id,
+      uid: decoded.id
+    };
     next();
   } catch (error) {
     console.error('❌ Token verification failed:', error);
     res.status(401).json({ message: 'Token is not valid' });
   }
 };
+
+// ✅ FIXED: Alias for backward compatibility (if you used authenticateWT somewhere)
+export const authenticateWT = authenticateToken;

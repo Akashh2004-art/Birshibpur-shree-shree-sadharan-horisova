@@ -58,6 +58,9 @@ async function request(
   }
 }
 
+// ✅ FIXED: Export apiRequest function
+export const apiRequest = request;
+
 export const userLogin = (data: {
   identifier: string;
   password: string;
@@ -182,6 +185,7 @@ export const galleryApi = {
 export default {
   userLogin,
   api,
+  apiRequest, // ✅ ADDED: Include apiRequest in default export
   sendForgotPasswordRequest,
   verifyOTP,
   setNewPassword,
