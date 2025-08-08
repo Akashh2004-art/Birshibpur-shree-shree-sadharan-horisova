@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useBooking } from '../context/BookingContext'; // Import booking context
 import { api } from '../utils/api';
-import BookingStatus from '../components/BookingStatus'; // Import status component
 
 export interface PujaService {
   id: number;
@@ -55,7 +53,6 @@ interface BookingForm {
 const Booking = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-  const { startStatusTracking, showStatusPage } = useBooking(); // Use booking context
   const [selectedService, setSelectedService] = useState<PujaService | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<BookingForm>({
@@ -70,14 +67,12 @@ const Booking = () => {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Get minimum date (tomorrow)
   const getMinDate = () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow.toISOString().split('T')[0];
   };
 
-  // Auto-fill form data when user is available
   useEffect(() => {
     window.scrollTo(0, 0);
     if (user && showForm) {
@@ -90,7 +85,6 @@ const Booking = () => {
     }
   }, [user, showForm]);
 
-  // Check for selected service from sessionStorage (when redirected back from login/signup)
   useEffect(() => {
     if (user) {
       const storedServiceId = sessionStorage.getItem('selectedServiceId');
@@ -102,18 +96,14 @@ const Booking = () => {
           setFormData(prev => ({ ...prev, serviceId: service.id }));
           setShowForm(true);
         }
-        // Clear the stored service ID
         sessionStorage.removeItem('selectedServiceId');
       }
     }
   }, [user]);
 
   const handleServiceSelect = (service: PujaService) => {
-    // Check if user is authenticated
     if (!user && !loading) {
-      // Store selected service ID in sessionStorage
       sessionStorage.setItem('selectedServiceId', service.id.toString());
-      // Redirect to signup/login page
       navigate('/signup', { 
         state: { 
           message: 'পূজা বুকিং করতে প্রথমে সাইন আপ করুন',
@@ -123,7 +113,6 @@ const Booking = () => {
       return;
     }
 
-    // If user is authenticated, show the form
     if (user) {
       setSelectedService(service);
       setFormData(prev => ({ ...prev, serviceId: service.id }));
@@ -143,7 +132,6 @@ const Booking = () => {
       return;
     }
 
-    // Validate date is not today or past
     const selectedDate = new Date(formData.date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -159,21 +147,6 @@ const Booking = () => {
       const response = await api.post('/bookings/create', formData);
 
       if (response.success) {
-        // ✅ UPDATED: Start real-time status tracking instead of showing success message
-        const bookingStatusData = {
-          bookingId: response.data.bookingId,
-          status: 'pending' as const,
-          serviceName: selectedService.name,
-          date: formData.date,
-          time: formData.time,
-          message: formData.message,
-          userId: user?.id || '',
-        };
-
-        // Start status tracking
-        startStatusTracking(bookingStatusData);
-
-        // Reset form
         setShowForm(false);
         setSelectedService(null);
         setFormData({
@@ -428,9 +401,6 @@ const Booking = () => {
           </div>
         </div>
       </div>
-
-      {/* ✅ UPDATED: Show BookingStatus component when status page is active */}
-      {showStatusPage && <BookingStatus />}
     </>
   );
 };
