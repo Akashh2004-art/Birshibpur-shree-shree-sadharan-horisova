@@ -34,7 +34,7 @@ const Navbar = () => {
   }, [isOpen]);
 
   return (
-    <nav className="bg-white shadow-lg sticky top-0 z-50">
+    <nav className="bg-white shadow-lg sticky top-0 z-[60]">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Left side - Temple Name with custom Bengali font */}

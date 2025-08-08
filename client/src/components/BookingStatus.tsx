@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useBooking } from '../context/BookingContext';
-import { XMarkIcon, CheckCircleIcon, ClockIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
+import {CheckCircleIcon, ClockIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 
 const BookingStatus: React.FC = () => {
   const { currentBooking, isConnected, stopStatusTracking } = useBooking();
@@ -111,18 +111,11 @@ const BookingStatus: React.FC = () => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-      <div className={`bg-gradient-to-br ${getStatusColor()} border-2 rounded-2xl shadow-2xl w-full max-w-md mx-auto animate-in duration-300`}>
+<div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-20 bg-black bg-opacity-60 backdrop-blur-sm">
+  <div className={`bg-gradient-to-br ${getStatusColor()} border-2 rounded-2xl shadow-2xl w-full max-w-md mx-auto animate-in duration-300`}>
+
         {/* Header */}
-        <div className="relative p-6 text-center border-b border-opacity-20 border-gray-400">
-          <button
-            onClick={handleClose}
-            className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 transition-colors"
-            disabled={currentBooking.status === 'approved'} // Prevent manual close for approved bookings during countdown
-          >
-            <XMarkIcon className="h-6 w-6" />
-          </button>
-          
+        <div className="relative p-6 text-center border-b border-opacity-20 border-gray-400">          
           <div className="flex justify-center mb-4">
             {getStatusIcon()}
           </div>

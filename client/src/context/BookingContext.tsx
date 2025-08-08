@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { api } from '../utils/api'; // Import your API utility
 
 export interface BookingStatusData {
   bookingId: string;
@@ -35,6 +36,83 @@ export const BookingProvider: React.FC<BookingProviderProps> = ({ children }) =>
   const [currentBooking, setCurrentBooking] = useState<BookingStatusData | null>(null);
   const [showStatusPage, setShowStatusPage] = useState(false);
   const [autoCloseTimeout, setAutoCloseTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // ✅ NEW: Check for active booking on page load
+  const checkActiveBooking = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      console.log('🔍 Checking for active bookings...');
+      const response = await api.get('/bookings/user');
+      
+      if (response.success && response.data?.length > 0) {
+        // Find the most recent pending or approved booking
+        const activeBooking = response.data.find((booking: any) => 
+          booking.status === 'pending' || booking.status === 'approved'
+        );
+
+        if (activeBooking) {
+          console.log('📌 Active booking found:', activeBooking);
+          
+          const bookingStatusData: BookingStatusData = {
+            bookingId: activeBooking._id,
+            status: activeBooking.status,
+            serviceName: activeBooking.serviceName,
+            date: activeBooking.date,
+            time: activeBooking.time,
+            message: activeBooking.message,
+            rejectionReason: activeBooking.rejectionReason,
+            userId: activeBooking.userId,
+          };
+
+          // ✅ Only show status page if booking is still relevant
+          if (shouldShowBookingStatus(activeBooking)) {
+            setCurrentBooking(bookingStatusData);
+            setShowStatusPage(true);
+            
+            // Join booking room for real-time updates
+            if (socket) {
+              socket.emit('joinBookingRoom', activeBooking._id);
+            }
+            
+            // Schedule auto-close if approved
+            if (activeBooking.status === 'approved') {
+              scheduleAutoClose(bookingStatusData);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error checking active bookings:', error);
+    }
+  };
+
+  // ✅ NEW: Check if booking status should be shown
+  const shouldShowBookingStatus = (booking: any): boolean => {
+    if (booking.status === 'pending') {
+      return true; // Always show pending bookings
+    }
+    
+    if (booking.status === 'approved') {
+      // Check if booking time hasn't passed + 5 minutes buffer
+      const bookingDateTime = new Date(`${booking.date} ${convertBengaliTime(booking.time)}`);
+      const endTime = new Date(bookingDateTime.getTime() + (getServiceDuration(booking.serviceName) * 60 * 1000));
+      const autoCloseTime = new Date(endTime.getTime() + (5 * 60 * 1000));
+      
+      return Date.now() < autoCloseTime.getTime();
+    }
+    
+    if (booking.status === 'rejected') {
+      // Show rejected bookings for 24 hours
+      const rejectedAt = new Date(booking.updatedAt || booking.createdAt);
+      const twentyFourHoursLater = new Date(rejectedAt.getTime() + (24 * 60 * 60 * 1000));
+      
+      return Date.now() < twentyFourHoursLater.getTime();
+    }
+    
+    return false;
+  };
 
   // Initialize socket connection
   useEffect(() => {
@@ -93,6 +171,13 @@ export const BookingProvider: React.FC<BookingProviderProps> = ({ children }) =>
       newSocket.disconnect();
     };
   }, []);
+
+  // ✅ NEW: Check for active booking when socket connects
+  useEffect(() => {
+    if (socket && isConnected) {
+      checkActiveBooking();
+    }
+  }, [socket, isConnected]);
 
   // Schedule auto-close for approved bookings
   const scheduleAutoClose = (booking: BookingStatusData) => {
