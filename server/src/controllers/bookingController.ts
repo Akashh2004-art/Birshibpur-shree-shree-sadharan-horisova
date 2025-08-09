@@ -2,26 +2,7 @@ import { Request, Response } from 'express';
 import Booking, { IBooking } from '../models/bookingModel';
 import Admin from '../models/adminModel';
 import { sendEmail } from '../utils/emailService';
-import { io } from '../app'; // Import io instance directly
-
-// Socket controller interface (if you have one)
-interface ISocketController {
-  notifyAdminsNewBooking: (data: any) => void;
-  emitBookingStatusUpdate: (bookingId: string, data: any) => void;
-  notifyUserBookingConfirmed: (userId: string, data: any) => void;
-  notifyUserBookingRejected: (userId: string, data: any) => void;
-  emitRealtimeStatsToAdmins: () => void;
-  getConnectedUsersCount: () => number;
-  getConnectedAdminsCount: () => number;
-  io: any;
-}
-
-// Mock socket controller if not available
-const getSocketController = (): ISocketController | null => {
-  // Return null if no socket controller is available
-  // You can implement your actual socket controller logic here
-  return null;
-};
+import { io } from '../app';
 
 export const createBooking = async (req: Request, res: Response) => {
   try {
@@ -73,7 +54,7 @@ export const createBooking = async (req: Request, res: Response) => {
       });
     }
 
-    // Check for duplicate bookings (same user, same service, same date and time)
+    // Check for duplicate bookings
     const existingBooking = await Booking.findOne({
       userId,
       serviceId,
@@ -105,21 +86,7 @@ export const createBooking = async (req: Request, res: Response) => {
 
     await newBooking.save();
 
-    // Real-time notification to admins via Socket.io
-    const socketController = getSocketController();
-    if (socketController) {
-      socketController.notifyAdminsNewBooking({
-        bookingId: newBooking._id.toString(),
-        userName: name,
-        userEmail: email,
-        serviceName,
-        date: bookingDate.toISOString(),
-        time,
-        message: message || ''
-      });
-    }
-
-    // Direct socket.io notification if socketController is not available
+    // Real-time notification to admins
     if (io) {
       io.to('admin-room').emit('newBooking', {
         bookingId: newBooking._id.toString(),
@@ -132,53 +99,37 @@ export const createBooking = async (req: Request, res: Response) => {
       });
     }
 
-    // Send email notifications to admins
+    // Send email to admins
     try {
       const admins = await Admin.find({}, 'email').lean();
       const adminEmails = admins.map(admin => admin.email).filter(email => email);
       
-      if (adminEmails.length === 0) {
-        const fallbackEmail = process.env.ADMIN_EMAIL || 'admin@temple.com';
-        adminEmails.push(fallbackEmail);
-        console.warn('No admin emails found in database, using fallback email:', fallbackEmail);
+      if (adminEmails.length > 0) {
+        const emailSubject = 'নতুন পূজা বুকিং - ' + serviceName;
+        const emailBody = `
+নতুন পূজা বুকিং এসেছে:
+
+বুকিং আইডি: ${newBooking._id}
+গ্রাহকের নাম: ${name}
+ইমেইল: ${email}
+ফোন: ${phone}
+পূজার নাম: ${serviceName}
+তারিখ: ${bookingDate.toLocaleDateString('bn-BD')}
+সময়: ${time}
+
+${message ? `বিশেষ নির্দেশনা: ${message}` : ''}
+
+অনুগ্রহ করে অ্যাডমিন প্যানেল থেকে এই বুকিংটি অনুমোদন বা বাতিল করুন।
+        `;
+
+        await Promise.all(
+          adminEmails.map(adminEmail => 
+            sendEmail(adminEmail, emailSubject, emailBody).catch(console.error)
+          )
+        );
       }
-
-      const emailSubject = 'নতুন পূজা বুকিং - ' + serviceName;
-      const emailBody = `
-        নতুন পূজা বুকিং এসেছে:
-        
-        বুকিং আইডি: ${newBooking._id}
-        গ্রাহকের নাম: ${name}
-        ইমেইল: ${email}
-        ফোন: ${phone}
-        পূজার নাম: ${serviceName}
-        তারিখ: ${bookingDate.toLocaleDateString('bn-BD')}
-        সময়: ${time}
-        
-        ${message ? `বিশেষ নির্দেশনা: ${message}` : ''}
-        
-        অনুগ্রহ করে অ্যাডমিন প্যানেল থেকে এই বুকিংটি অনুমোদন বা বাতিল করুন।
-      `;
-
-      const emailPromises = adminEmails.map(adminEmail => 
-        sendEmail(adminEmail, emailSubject, emailBody)
-          .catch(error => {
-            console.error(`Failed to send email to ${adminEmail}:`, error);
-            return null;
-          })
-      );
-
-      const emailResults = await Promise.allSettled(emailPromises);
-      const successCount = emailResults.filter(result => result.status === 'fulfilled' && result.value !== null).length;
-      const failCount = emailResults.length - successCount;
-      
-      console.log(`Email notification sent to ${successCount}/${emailResults.length} admins`);
-      if (failCount > 0) {
-        console.warn(`Failed to send ${failCount} admin notification emails`);
-      }
-
     } catch (emailError) {
-      console.error('Error fetching admin emails or sending notifications:', emailError);
+      console.error('Error sending admin notifications:', emailError);
     }
 
     res.status(201).json({
@@ -215,21 +166,9 @@ export const getUserBookings = async (req: Request, res: Response) => {
 
     const total = await Booking.countDocuments({ userId });
 
-    // Get booking stats for the user
-    const stats = await Booking.aggregate([
-      { $match: { userId } },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-
     res.json({
       success: true,
       data: bookings,
-      stats,
       pagination: {
         current: Number(page),
         pages: Math.ceil(total / Number(limit)),
@@ -267,9 +206,6 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
       });
     }
 
-    // Store previous status for comparison
-    const previousStatus = booking.status;
-
     // Update booking status
     booking.status = status;
     if (status === 'rejected' && rejectionReason) {
@@ -278,52 +214,8 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
 
     await booking.save();
 
-    // Real-time status update via Socket.io
-    const socketController = getSocketController();
-    if (socketController) {
-      socketController.emitBookingStatusUpdate(booking._id.toString(), {
-        status: booking.status,
-        serviceName: booking.serviceName,
-        date: booking.date.toISOString(),
-        time: booking.time,
-        rejectionReason: booking.rejectionReason,
-        message: booking.message,
-        userId: booking.userId.toString()
-      });
-
-      // Send specific notifications to user
-      if (status === 'approved') {
-        socketController.notifyUserBookingConfirmed(booking.userId.toString(), {
-          bookingId: booking._id.toString(),
-          serviceName: booking.serviceName,
-          date: booking.date.toISOString(),
-          time: booking.time,
-          message: booking.message
-        });
-      } else if (status === 'rejected') {
-        socketController.notifyUserBookingRejected(booking.userId.toString(), {
-          bookingId: booking._id.toString(),
-          serviceName: booking.serviceName,
-          rejectionReason: booking.rejectionReason
-        });
-      }
-
-      // Update realtime stats for admins
-      socketController.emitRealtimeStatsToAdmins();
-    }
-
-    // Direct socket.io emissions if socketController is not available
+    // Real-time notification to user
     if (io) {
-      io.to('admin-room').emit('bookingStatusUpdate', {
-        bookingId: booking._id.toString(),
-        status: booking.status,
-        serviceName: booking.serviceName,
-        date: booking.date.toISOString(),
-        time: booking.time,
-        rejectionReason: booking.rejectionReason
-      });
-
-      // Emit to specific user
       io.to(`user-${booking.userId}`).emit('bookingStatusUpdate', {
         bookingId: booking._id.toString(),
         status: booking.status,
@@ -331,6 +223,14 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
         date: booking.date.toISOString(),
         time: booking.time,
         rejectionReason: booking.rejectionReason
+      });
+
+      // Notify admins about the update
+      io.to('admin-room').emit('bookingStatusUpdate', {
+        bookingId: booking._id.toString(),
+        status: booking.status,
+        serviceName: booking.serviceName,
+        userName: booking.userName
       });
     }
 
@@ -359,13 +259,9 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
 অনুগ্রহ করে:
 • নির্ধারিত তারিখ ও সময়ে মন্দিরে উপস্থিত হন
 • পূজার ১৫ মিনিট আগে এসে যান
-• প্রয়োজনীয় উপকরণ সাথে নিয়ে আসুন
-
-যোগাযোগের জন্য: ${process.env.TEMPLE_PHONE || '01XXXXXXXXX'}
-মন্দিরের ঠিকানা: ${process.env.TEMPLE_ADDRESS || 'মন্দিরের ঠিকানা'}
 
 ধন্যবাদ,
-${process.env.TEMPLE_NAME || 'মন্দির'} কমিটি
+মন্দির কমিটি
       `;
     } else {
       emailBody += `
@@ -374,20 +270,16 @@ ${process.env.TEMPLE_NAME || 'মন্দির'} কমিটি
 ${rejectionReason ? `বাতিলের কারণ: ${rejectionReason}` : ''}
 
 • আপনি অন্য তারিখে আবার বুকিং করতে পারেন
-• আরও তথ্যের জন্য আমাদের সাথে যোগাযোগ করুন
-
-যোগাযোগের জন্য: ${process.env.TEMPLE_PHONE || '01XXXXXXXXX'}
 
 ধন্যবাদ,
-${process.env.TEMPLE_NAME || 'মন্দির'} কমিটি
+মন্দির কমিটি
       `;
     }
 
     try {
       await sendEmail(booking.userEmail, emailSubject, emailBody);
-      console.log(`✅ Status update notification sent to user: ${booking.userEmail}`);
     } catch (emailError) {
-      console.error('❌ Failed to send user notification email:', emailError);
+      console.error('Failed to send user notification email:', emailError);
     }
 
     res.json({
@@ -405,115 +297,6 @@ ${process.env.TEMPLE_NAME || 'মন্দির'} কমিটি
   }
 };
 
-export const deleteBooking = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-
-    const booking = await Booking.findById(id);
-    
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Booking not found'
-      });
-    }
-
-    await Booking.findByIdAndDelete(id);
-
-    // Update realtime stats after deletion
-    const socketController = getSocketController();
-    if (socketController) {
-      socketController.emitRealtimeStatsToAdmins();
-      
-      // Notify admins about booking deletion
-      socketController.io.to('admin-room').emit('bookingDeleted', {
-        bookingId: id,
-        serviceName: booking.serviceName,
-        userName: booking.userName,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // Direct socket.io emission if socketController is not available
-    if (io) {
-      io.to('admin-room').emit('bookingDeleted', {
-        bookingId: id,
-        serviceName: booking.serviceName,
-        userName: booking.userName,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Booking deleted successfully'
-    });
-
-  } catch (error) {
-    console.error('Error deleting booking:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting booking'
-    });
-  }
-};
-
-export const getBookingStats = async (req: Request, res: Response) => {
-  try {
-    const today = new Date();
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const startOfDay = new Date(today.setHours(0, 0, 0, 0));
-
-    const stats = await Promise.all([
-      // Total bookings
-      Booking.countDocuments(),
-      
-      // Pending bookings
-      Booking.countDocuments({ status: 'pending' }),
-      
-      // Today's bookings
-      Booking.countDocuments({
-        createdAt: { $gte: startOfDay }
-      }),
-      
-      // This month's bookings
-      Booking.countDocuments({
-        createdAt: { $gte: startOfMonth }
-      })
-    ]);
-
-    // Include realtime connection stats
-    const socketController = getSocketController();
-    const connectionStats = socketController ? {
-      connectedUsers: socketController.getConnectedUsersCount(),
-      connectedAdmins: socketController.getConnectedAdminsCount()
-    } : {
-      connectedUsers: 0,
-      connectedAdmins: 0
-    };
-
-    res.json({
-      success: true,
-      data: {
-        total: stats[0],
-        pending: stats[1],
-        today: stats[2],
-        thisMonth: stats[3],
-        ...connectionStats,
-        timestamp: new Date().toISOString()
-      }
-    });
-
-  } catch (error) {
-    console.error('Error fetching booking stats:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching statistics'
-    });
-  }
-};
-
-// Admin functions
 export const getAllBookings = async (req: Request, res: Response) => {
   try {
     const { page = 1, limit = 20, status, search } = req.query;
@@ -564,6 +347,224 @@ export const getAllBookings = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching bookings'
+    });
+  }
+};
+
+export const deleteBooking = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const booking = await Booking.findById(id);
+    
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found'
+      });
+    }
+
+    await Booking.findByIdAndDelete(id);
+
+    // Notify admins about deletion
+    if (io) {
+      io.to('admin-room').emit('bookingDeleted', {
+        bookingId: id,
+        serviceName: booking.serviceName,
+        userName: booking.userName
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Booking deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting booking:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting booking'
+    });
+  }
+};
+
+// ✅ ADDED: Missing getBookingStats function
+export const getBookingStats = async (req: Request, res: Response) => {
+  try {
+    // Basic stats aggregation
+    const stats = await Booking.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          totalAmount: { $sum: { $ifNull: ['$amount', 0] } }
+        }
+      }
+    ]);
+
+    // Daily booking stats (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const dailyStats = await Booking.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: sevenDaysAgo }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$createdAt' }
+          },
+          count: { $sum: 1 },
+          approved: {
+            $sum: { $cond: [{ $eq: ['$status', 'approved'] }, 1, 0] }
+          },
+          pending: {
+            $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] }
+          },
+          rejected: {
+            $sum: { $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0] }
+          }
+        }
+      },
+      {
+        $sort: { '_id': 1 }
+      }
+    ]);
+
+    // Service-wise booking stats
+    const serviceStats = await Booking.aggregate([
+      {
+        $group: {
+          _id: '$serviceName',
+          count: { $sum: 1 },
+          approved: {
+            $sum: { $cond: [{ $eq: ['$status', 'approved'] }, 1, 0] }
+          }
+        }
+      },
+      {
+        $sort: { count: -1 }
+      }
+    ]);
+
+    // Monthly revenue (current month)
+    const currentMonthStart = new Date();
+    currentMonthStart.setDate(1);
+    currentMonthStart.setHours(0, 0, 0, 0);
+
+    const monthlyRevenue = await Booking.aggregate([
+      {
+        $match: {
+          status: 'approved',
+          createdAt: { $gte: currentMonthStart }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: { $ifNull: ['$amount', 0] } },
+          totalBookings: { $sum: 1 }
+        }
+      }
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        overallStats: stats,
+        dailyStats,
+        serviceStats,
+        monthlyRevenue: monthlyRevenue[0] || { totalRevenue: 0, totalBookings: 0 }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching booking stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching booking statistics'
+    });
+  }
+};
+
+
+export const getCurrentBookingStatus = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id || (req as any).user?._id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
+    // Find user's active booking (pending or approved)
+    const activeBooking = await Booking.findOne({
+      userId,
+      status: { $in: ['pending', 'approved'] }
+    }).sort({ createdAt: -1 });
+
+    if (!activeBooking) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'No active booking found'
+      });
+    }
+
+    // Check if approved booking has expired
+    if (activeBooking.status === 'approved') {
+      const bookingDateTime = new Date(activeBooking.date);
+      const [timeStr] = activeBooking.time.split(' ');
+      const [hour, minute] = timeStr.split(':').map(Number);
+
+      bookingDateTime.setHours(hour, minute + 5, 0, 0); // Add 5 min grace period
+
+      const now = new Date();
+
+      if (now > bookingDateTime) {
+        return res.json({
+          success: true,
+          data: {
+            expired: true,
+            bookingId: activeBooking._id.toString(),
+            serviceName: activeBooking.serviceName,
+            date: activeBooking.date.toISOString(),
+            time: activeBooking.time,
+            status: activeBooking.status, // still shows approved
+            rejectionReason: activeBooking.rejectionReason,
+            message: activeBooking.message
+          },
+          message: 'Booking is expired'
+        });
+      }
+    }
+
+    // Return active booking (not expired)
+    res.json({
+      success: true,
+      data: {
+        expired: false,
+        bookingId: activeBooking._id.toString(),
+        serviceName: activeBooking.serviceName,
+        date: activeBooking.date.toISOString(),
+        time: activeBooking.time,
+        status: activeBooking.status,
+        rejectionReason: activeBooking.rejectionReason,
+        message: activeBooking.message
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching current booking status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching booking status'
     });
   }
 };

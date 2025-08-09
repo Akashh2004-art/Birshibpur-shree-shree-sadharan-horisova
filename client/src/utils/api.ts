@@ -164,6 +164,50 @@ export const getGalleryStats = () => {
   return request("/gallery/stats", { method: "GET" });
 };
 
+
+export const getCurrentBookingStatus = () => {
+  return request("/bookings/user/current", { method: "GET" });
+};
+
+export const createBooking = (data: {
+  name: string;
+  email: string;
+  phone: string;
+  serviceId: number;
+  date: string;
+  time: string;
+  message?: string;
+}) => {
+  if (!data.name || !data.email || !data.phone || !data.serviceId || !data.date || !data.time) {
+    throw new Error("সব তথ্য পূরণ করুন");
+  }
+  return request("/bookings/create", { data, method: "POST" });
+};
+
+export const getUserBookings = (params?: {
+  page?: number;
+  limit?: number;
+}) => {
+  const queryString = params
+    ? "?" +
+      new URLSearchParams(
+        Object.entries(params)
+          .filter(([, value]) => value !== undefined)
+          .map(([key, value]) => [key, String(value)])
+      ).toString()
+    : "";
+
+  return request(`/bookings/user${queryString}`, { method: "GET" });
+};
+
+// ✅ Booking API object for easier usage
+export const bookingApi = {
+  getCurrent: getCurrentBookingStatus,
+  create: createBooking,
+  getUserBookings,
+};
+
+
 export const api = {
   get: (endpoint: string, config: RequestConfig = {}) =>
     request(endpoint, { ...config, method: "GET" }),
@@ -185,7 +229,7 @@ export const galleryApi = {
 export default {
   userLogin,
   api,
-  apiRequest, // ✅ ADDED: Include apiRequest in default export
+  apiRequest,
   sendForgotPasswordRequest,
   verifyOTP,
   setNewPassword,
@@ -197,4 +241,8 @@ export default {
   getGalleryItem,
   getGalleryStats,
   galleryApi,
+  getCurrentBookingStatus,  
+  createBooking,             
+  getUserBookings,           
+  bookingApi,               
 };

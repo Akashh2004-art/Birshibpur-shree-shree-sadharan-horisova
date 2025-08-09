@@ -63,11 +63,12 @@ const bookingSchema = new Schema<IBooking>({
     trim: true,
     default: ''
   },
-  status: {
-    type: String,
-    enum: ['pending', 'approved', 'rejected'],
-    default: 'pending'
-  },
+status: {
+  type: String,
+  enum: ['pending', 'approved', 'rejected', 'expired'], 
+  default: 'pending'
+}
+,
   rejectionReason: {
     type: String,
     trim: true

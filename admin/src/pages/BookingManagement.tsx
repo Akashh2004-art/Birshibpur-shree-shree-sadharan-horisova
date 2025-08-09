@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckIcon, XMarkIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline';
+import adminSocketService from '../services/socketService';
 
 interface Booking {
   _id: string;
@@ -9,10 +10,10 @@ interface Booking {
   serviceName: string;
   date: string;
   time: string;
-  people: number;
+  people?: number;
   message?: string;
   status: 'pending' | 'approved' | 'rejected';
-  amount: number;
+  amount?: number;
   createdAt: string;
   rejectionReason?: string;
 }
@@ -20,7 +21,14 @@ interface Booking {
 interface Stats {
   _id: string;
   count: number;
-  totalAmount: number;
+  totalAmount?: number;
+}
+
+interface ConnectionStats {
+  totalConnections: number;
+  adminConnections: number;
+  userConnections: number;
+  timestamp: string;
 }
 
 const BookingManagement: React.FC = () => {
@@ -33,11 +41,115 @@ const BookingManagement: React.FC = () => {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [stats, setStats] = useState<Stats[]>([]);
+  const [connectionStats, setConnectionStats] = useState<ConnectionStats | null>(null);
+  const [socketConnected, setSocketConnected] = useState(false);
+  const [realtimeUpdates, setRealtimeUpdates] = useState(0); // Counter for real-time updates
   const [pagination, setPagination] = useState({
     current: 1,
     pages: 1,
     total: 0
   });
+
+  // ✅ SOCKET CONNECTION AND EVENT HANDLERS
+  useEffect(() => {
+    // Initialize socket connection
+    adminSocketService.connect();
+    setSocketConnected(adminSocketService.isConnected());
+
+    // Listen for connection status changes
+    const socket = adminSocketService.getSocket();
+    if (socket) {
+      socket.on('connect', () => {
+        console.log('✅ Admin socket connected');
+        setSocketConnected(true);
+        setError(''); // Clear connection errors
+      });
+
+      socket.on('disconnect', (reason) => {
+        console.log('❌ Admin socket disconnected:', reason);
+        setSocketConnected(false);
+      });
+
+      socket.on('connect_error', (error) => {
+        console.error('❌ Socket connection error:', error);
+        setSocketConnected(false);
+        setError('Real-time connection failed. Data may not be up to date.');
+      });
+
+      // Listen for admin room join confirmation
+      socket.on('admin-room-joined', (data) => {
+        console.log('👨‍💼 Joined admin room:', data);
+        if (data.connectionStats) {
+          setConnectionStats(data.connectionStats);
+        }
+      });
+    }
+
+    // ✅ REAL-TIME EVENT LISTENERS
+    // Listen for new bookings
+    adminSocketService.onNewBooking((data) => {
+      console.log('🆕 New booking received:', data);
+      setRealtimeUpdates(prev => prev + 1);
+      
+      // Show notification
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(`নতুন পূজা বুকিং - ${data.serviceName}`, {
+          body: `${data.userName} একটি নতুন বুকিং করেছেন`,
+          icon: '/favicon.ico'
+        });
+      }
+
+      // Refresh bookings to get the latest data
+      fetchBookings(pagination.current, selectedStatus, searchTerm);
+    });
+
+    // Listen for booking status updates
+    adminSocketService.onBookingStatusUpdate((data) => {
+      console.log('📝 Booking status updated:', data);
+      setRealtimeUpdates(prev => prev + 1);
+      
+      // Update local state
+      setBookings(prevBookings => 
+        prevBookings.map(booking => 
+          booking._id === data.bookingId 
+            ? { ...booking, status: data.status }
+            : booking
+        )
+      );
+    });
+
+    // Listen for booking deletions
+    adminSocketService.onBookingDeleted((data) => {
+      console.log('🗑️ Booking deleted:', data);
+      setRealtimeUpdates(prev => prev + 1);
+      
+      // Remove from local state
+      setBookings(prevBookings => 
+        prevBookings.filter(booking => booking._id !== data.bookingId)
+      );
+    });
+
+    // Listen for connection stats updates
+    adminSocketService.onConnectionStats((data) => {
+      setConnectionStats(data);
+    });
+
+    // Cleanup on unmount
+    return () => {
+      adminSocketService.offNewBooking();
+      adminSocketService.offBookingStatusUpdate();
+      adminSocketService.offBookingDeleted();
+      adminSocketService.offConnectionStats();
+      adminSocketService.disconnect();
+    };
+  }, []);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
 
   // ✅ FIXED: Use consistent token key
   const fetchBookings = async (page = 1, status = 'all', search = '') => {
@@ -65,7 +177,6 @@ const BookingManagement: React.FC = () => {
       const url = `${apiUrl}/api/bookings/admin/all?${queryParams}`;
       
       console.log('📡 Fetching bookings from:', url); // Debug log
-      console.log('📡 Token exists:', !!token); // Debug log
 
       const response = await fetch(url, {
         method: 'GET',
@@ -77,14 +188,11 @@ const BookingManagement: React.FC = () => {
       });
 
       console.log('📡 Response status:', response.status); // Debug log
-      console.log('📡 Response headers:', response.headers.get('content-type')); // Debug log
 
       // ✅ FIXED: Better error handling for 401
       if (response.status === 401) {
         localStorage.removeItem('token');
         setError('Session expired. Please login again.');
-        // Optionally redirect to login
-        // window.location.href = '/login';
         return;
       }
 
@@ -161,11 +269,19 @@ const BookingManagement: React.FC = () => {
       const data = await response.json();
       
       if (data.success) {
-        // Refresh bookings
-        await fetchBookings(pagination.current, selectedStatus, searchTerm);
+        // ✅ NO NEED TO REFRESH - Socket will handle the update
         setShowModal(false);
         setRejectionReason('');
         setSelectedBooking(null);
+        
+        // Show success notification
+        if ('Notification' in window && Notification.permission === 'granted') {
+          const statusText = status === 'approved' ? 'অনুমোদিত' : 'বাতিল';
+          new Notification(`বুকিং ${statusText}`, {
+            body: `${selectedBooking?.userName} এর বুকিং ${statusText} করা হয়েছে`,
+            icon: '/favicon.ico'
+          });
+        }
       } else {
         setError(data.message || 'Failed to update booking status');
       }
@@ -217,8 +333,14 @@ const BookingManagement: React.FC = () => {
       const data = await response.json();
       
       if (data.success) {
-        // Refresh bookings
-        await fetchBookings(pagination.current, selectedStatus, searchTerm);
+        // ✅ NO NEED TO REFRESH - Socket will handle the update
+        // Show success notification
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('বুকিং মুছে ফেলা হয়েছে', {
+            body: 'বুকিং সফলভাবে মুছে ফেলা হয়েছে',
+            icon: '/favicon.ico'
+          });
+        }
       } else {
         setError(data.message || 'Failed to delete booking');
       }
@@ -288,7 +410,7 @@ const BookingManagement: React.FC = () => {
   const getTotalRevenue = () => {
     return stats
       .filter(s => s._id === 'approved')
-      .reduce((total, stat) => total + stat.totalAmount, 0);
+      .reduce((total, stat) => total + (stat.totalAmount || 0), 0);
   };
 
   if (loading && bookings.length === 0) {
@@ -312,6 +434,34 @@ const BookingManagement: React.FC = () => {
             <span>বাতিল: {getStatsForStatus('rejected')}</span>
             <span>আয়: ₹{getTotalRevenue()}</span>
           </div>
+        </div>
+
+        {/* ✅ SOCKET CONNECTION STATUS */}
+        <div className="flex flex-col items-end gap-2 mt-4 sm:mt-0">
+          <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs ${
+            socketConnected 
+              ? 'bg-green-100 text-green-800' 
+              : 'bg-red-100 text-red-800'
+          }`}>
+            <span className={`w-2 h-2 rounded-full mr-2 ${
+              socketConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+            }`}></span>
+            {socketConnected ? 'রিয়েল-টাইম সংযুক্ত' : 'সংযোগ বিচ্ছিন্ন'}
+          </div>
+
+          {/* Connection Stats */}
+          {connectionStats && (
+            <div className="text-xs text-gray-500 text-right">
+              <div>মোট: {connectionStats.totalConnections} | অ্যাডমিন: {connectionStats.adminConnections} | ইউজার: {connectionStats.userConnections}</div>
+            </div>
+          )}
+
+          {/* Real-time Updates Counter */}
+          {realtimeUpdates > 0 && (
+            <div className="text-xs text-blue-600">
+              রিয়েল-টাইম আপডেট: {realtimeUpdates}
+            </div>
+          )}
         </div>
       </div>
 

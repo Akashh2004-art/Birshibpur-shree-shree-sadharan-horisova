@@ -5,7 +5,8 @@ import {
   getAllBookings,
   updateBookingStatus,
   deleteBooking,
-  getBookingStats
+  getBookingStats,
+  getCurrentBookingStatus, // ✅ ADD THIS IMPORT
 } from '../controllers/bookingController';
 import { authenticateToken } from '../middleware/authMiddleware';
 
@@ -14,6 +15,7 @@ const router = express.Router();
 // User routes (require authentication)
 router.post('/create', authenticateToken, createBooking);
 router.get('/user', authenticateToken, getUserBookings);
+router.get('/user/current', authenticateToken, getCurrentBookingStatus); // ✅ ADD THIS ROUTE
 
 // Admin routes (require admin authentication)
 router.get('/admin/all', authenticateToken, getAllBookings);
