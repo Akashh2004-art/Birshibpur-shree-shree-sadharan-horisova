@@ -1,7 +1,6 @@
 import { Server } from 'socket.io';
 import { Server as HttpServer } from 'http';
 import jwt from 'jsonwebtoken';
-import type { SocketUser, ConnectionStats, BookingStatusUpdate, NewBookingData } from '../types/socket';
 
 // ✅ Export IO instance for use in controllers
 let ioInstance: Server | undefined;
@@ -17,6 +16,10 @@ export const getIO = (): Server => {
   return ioInstance;
 };
 
+// ✅ CONNECTION TRACKING TO PREVENT DUPLICATES
+const userConnections = new Map<string, string>(); // userId -> socketId
+const socketUsers = new Map<string, string>(); // socketId -> userId
+
 export const initializeSocket = (server: HttpServer): Server => {
   const io = new Server(server, {
     cors: {
@@ -27,10 +30,14 @@ export const initializeSocket = (server: HttpServer): Server => {
       methods: ["GET", "POST"],
       credentials: true
     },
-    transports: ['websocket', 'polling']
+    transports: ['websocket', 'polling'],
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    maxHttpBufferSize: 1e6, // 1MB
+    allowEIO3: true
   });
 
-  // ✅ FIXED: Authentication middleware for socket connections
+  // ✅ AUTHENTICATION MIDDLEWARE
   io.use((socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
@@ -40,22 +47,19 @@ export const initializeSocket = (server: HttpServer): Server => {
         return next(new Error('Authentication token required'));
       }
 
-      // Verify JWT token
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default-secret') as any;
       
-      // Validate decoded token
       if (!decoded || (!decoded.id && !decoded._id) || !decoded.email) {
         return next(new Error('Invalid token payload'));
       }
       
-      // Attach user info to socket
       socket.data.user = {
         id: decoded.id || decoded._id,
         email: decoded.email,
         role: decoded.role || 'user'
       };
 
-      console.log(`✅ Socket authenticated: ${decoded.email} (Role: ${decoded.role}) (Socket: ${socket.id})`);
+      console.log(`✅ Socket authenticated: ${decoded.email} (${socket.id})`);
       next();
     } catch (error) {
       console.error('❌ Socket authentication failed:', error);
@@ -63,28 +67,9 @@ export const initializeSocket = (server: HttpServer): Server => {
     }
   });
 
-  // ✅ Connection stats tracking
-  const connectionStats: ConnectionStats = {
-    totalConnections: 0,
-    adminConnections: 0,
-    userConnections: 0,
-    timestamp: new Date().toISOString()
-  };
-
-  const updateConnectionStats = (): void => {
-    const adminSockets = io.sockets.adapter.rooms.get('admin-room');
-    connectionStats.totalConnections = io.sockets.sockets.size;
-    connectionStats.adminConnections = adminSockets?.size || 0;
-    connectionStats.userConnections = connectionStats.totalConnections - connectionStats.adminConnections;
-    connectionStats.timestamp = new Date().toISOString();
-    
-    // Broadcast stats to all admins
-    io.to('admin-room').emit('connectionStats', connectionStats);
-  };
-
-  // Handle socket connections
+  // ✅ CONNECTION HANDLER
   io.on('connection', (socket) => {
-    const user = socket.data?.user as SocketUser;
+    const user = socket.data?.user;
     
     if (!user) {
       console.error('❌ No user data found in socket');
@@ -92,96 +77,121 @@ export const initializeSocket = (server: HttpServer): Server => {
       return;
     }
 
-    console.log(`🔌 User connected: ${user.email} (Role: ${user.role}) (Socket: ${socket.id})`);
+    console.log(`🔌 New socket connection: ${socket.id} (${user.email})`);
 
-    // Join user to their personal room for user-specific updates
-    socket.join(`user:${user.id}`);
-    console.log(`👤 User joined room: user:${user.id}`);
-    
-    // Join admins to admin room for admin-specific updates
-    if (user.role === 'admin') {
-      socket.join('admin-room');
-      console.log(`👑 Admin joined admin-room: ${user.email}`);
+    // ✅ JOIN USER ROOM WITH DUPLICATE PREVENTION
+    socket.on('join-user-room', (userId: string) => {
+      if (!userId) return;
+
+      // ✅ CHECK FOR EXISTING CONNECTION
+      const existingSocketId = userConnections.get(userId);
+      if (existingSocketId && existingSocketId !== socket.id) {
+        // Disconnect previous socket for this user
+        const existingSocket = io.sockets.sockets.get(existingSocketId);
+        if (existingSocket) {
+          console.log(`🔄 Disconnecting previous connection for user ${userId}`);
+          existingSocket.emit('duplicate-connection', 'New connection established');
+          existingSocket.disconnect(true);
+        }
+      }
+
+      // ✅ JOIN ROOM AND TRACK CONNECTION
+      const roomName = `user-${userId}`;
+      socket.join(roomName);
       
-      // Send connection stats to newly connected admin
+      // Update tracking maps
+      userConnections.set(userId, socket.id);
+      socketUsers.set(socket.id, userId);
+      
+      console.log(`👤 User ${userId} joining room: ${roomName}`);
+      
+      socket.emit('user-room-joined', { 
+        userId, 
+        room: roomName,
+        message: 'Successfully joined user room'
+      });
+    });
+
+    // ✅ LEAVE USER ROOM
+    socket.on('leave-user-room', (userId: string) => {
+      if (!userId) return;
+
+      const roomName = `user-${userId}`;
+      socket.leave(roomName);
+      
+      // Clean up tracking
+      userConnections.delete(userId);
+      socketUsers.delete(socket.id);
+      
+      console.log(`👤 User ${userId} left room: ${roomName}`);
+      
+      socket.emit('user-room-left', { 
+        userId, 
+        room: roomName,
+        message: 'Left user room'
+      });
+    });
+
+    // ✅ ADMIN ROOM MANAGEMENT
+    socket.on('join-admin-room', () => {
+      if (user.role !== 'admin') {
+        socket.emit('error', 'Unauthorized: Admin access required');
+        return;
+      }
+
+      socket.join('admin-room');
+      console.log(`👨‍💼 Admin ${user.email} joined admin room`);
+      
       socket.emit('admin-room-joined', {
         message: 'Successfully joined admin room',
         connectionStats: {
-          ...connectionStats,
+          totalConnections: io.sockets.sockets.size,
+          adminConnections: io.sockets.adapter.rooms.get('admin-room')?.size || 0,
+          userConnections: userConnections.size,
           timestamp: new Date().toISOString()
         }
       });
-    }
-
-    // Update connection stats
-    updateConnectionStats();
-
-    // ✅ FIXED: Handle user room joining
-    socket.on('join-user-room', (userId: string) => {
-      if (userId) {
-        socket.join(`user:${userId}`);
-        console.log(`👤 User manually joined room: user:${userId}`);
-        socket.emit('user-room-joined', { 
-          userId, 
-          message: 'Successfully joined user room' 
-        });
-      }
     });
 
-    // ✅ FIXED: Handle admin room joining
-    socket.on('join-admin-room', () => {
-      if (user.role === 'admin') {
-        socket.join('admin-room');
-        console.log(`👑 Admin manually joined admin-room: ${user.email}`);
-        socket.emit('admin-room-joined', {
-          message: 'Successfully joined admin room',
-          connectionStats: {
-            ...connectionStats,
-            timestamp: new Date().toISOString()
-          }
-        });
-        updateConnectionStats();
-      }
-    });
-
-    // Handle leaving user room
-    socket.on('leave-user-room', (userId: string) => {
-      if (userId) {
-        socket.leave(`user:${userId}`);
-        console.log(`👤 User left room: user:${userId}`);
-      }
-    });
-
-    // Handle leaving admin room
+    // ✅ LEAVE ADMIN ROOM
     socket.on('leave-admin-room', () => {
       socket.leave('admin-room');
-      console.log(`👑 Admin left admin-room: ${user.email}`);
-      updateConnectionStats();
+      console.log(`👨‍💼 Admin ${user.email} left admin room`);
+      
+      socket.emit('admin-room-left', {
+        message: 'Left admin room'
+      });
     });
 
-    // Handle joining specific booking room for real-time status updates
+    // ✅ BOOKING ROOM MANAGEMENT
     socket.on('joinBookingRoom', (bookingId: string) => {
-      if (bookingId) {
-        socket.join(`booking:${bookingId}`);
-        console.log(`📋 User joined booking room: booking:${bookingId} (${user.email})`);
-      }
+      if (!bookingId) return;
+      
+      const roomName = `booking-${bookingId}`;
+      socket.join(roomName);
+      console.log(`📋 User joined booking room: ${roomName}`);
+      
+      socket.emit('booking-room-joined', {
+        bookingId,
+        room: roomName,
+        message: 'Successfully joined booking room'
+      });
     });
 
-    // Handle leaving booking room
     socket.on('leaveBookingRoom', (bookingId: string) => {
-      if (bookingId) {
-        socket.leave(`booking:${bookingId}`);
-        console.log(`📋 User left booking room: booking:${bookingId} (${user.email})`);
-      }
+      if (!bookingId) return;
+      
+      const roomName = `booking-${bookingId}`;
+      socket.leave(roomName);
+      console.log(`📋 User left booking room: ${roomName}`);
     });
 
-    // Handle admin actions (approve/reject bookings)
+    // ✅ BOOKING STATUS UPDATES (Admin only)
     socket.on('updateBookingStatus', (data: {
       bookingId: string;
       status: 'approved' | 'rejected';
       rejectionReason?: string;
     }) => {
-      // Only allow admins to update booking status
       if (user.role !== 'admin') {
         socket.emit('error', { message: 'Unauthorized action' });
         return;
@@ -194,29 +204,20 @@ export const initializeSocket = (server: HttpServer): Server => {
 
       console.log(`📝 Admin ${user.email} updating booking ${data.bookingId} to ${data.status}`);
       
-      // Broadcast status update to the specific booking room AND user room
-      const updateData: BookingStatusUpdate = {
+      // Broadcast to booking room and user room
+      const updateData = {
         bookingId: data.bookingId,
         status: data.status,
         rejectionReason: data.rejectionReason,
-        serviceName: '', // Will be filled by controller
-        date: '', // Will be filled by controller
-        time: '', // Will be filled by controller
-        userId: '', // Will be filled by controller
         timestamp: new Date().toISOString()
       };
 
-      // Emit to booking room
-      io.to(`booking:${data.bookingId}`).emit('bookingStatusUpdate', updateData);
-      
-      // ✅ NEW: Also emit to all connected users for this booking
-      io.emit('bookingStatusUpdate', updateData);
-      
+      io.to(`booking-${data.bookingId}`).emit('bookingStatusUpdate', updateData);
       console.log(`📤 Status update broadcasted for booking: ${data.bookingId}`);
     });
 
-    // Handle new booking notifications to admins
-    socket.on('newBookingNotification', (bookingData: Partial<NewBookingData>) => {
+    // ✅ NEW BOOKING NOTIFICATIONS
+    socket.on('newBookingNotification', (bookingData: any) => {
       if (!bookingData.bookingId) {
         socket.emit('error', { message: 'Invalid booking notification data' });
         return;
@@ -224,38 +225,78 @@ export const initializeSocket = (server: HttpServer): Server => {
 
       console.log(`📢 New booking notification: ${bookingData.bookingId}`);
       
-      // Notify all connected admins
       io.to('admin-room').emit('newBooking', {
         ...bookingData,
         timestamp: new Date().toISOString()
       });
     });
 
-    // Handle disconnect
+    // ✅ HEARTBEAT
+    socket.on('ping', (callback) => {
+      if (typeof callback === 'function') {
+        callback('pong');
+      }
+    });
+
+    // ✅ DISCONNECT CLEANUP
     socket.on('disconnect', (reason) => {
-      console.log(`🔌 User disconnected: ${user.email} (${socket.id}) - ${reason}`);
-      // Update connection stats with delay to ensure cleanup
-      setTimeout(updateConnectionStats, 100);
+      console.log(`🔌 Socket disconnected: ${socket.id} (${user.email}) - ${reason}`);
+      
+      // Clean up tracking maps
+      const userId = socketUsers.get(socket.id);
+      if (userId) {
+        userConnections.delete(userId);
+        socketUsers.delete(socket.id);
+      }
+      
+      // Broadcast updated stats to admins
+      setTimeout(() => {
+        io.to('admin-room').emit('connectionStats', {
+          totalConnections: io.sockets.sockets.size,
+          adminConnections: io.sockets.adapter.rooms.get('admin-room')?.size || 0,
+          userConnections: userConnections.size,
+          timestamp: new Date().toISOString()
+        });
+      }, 100);
     });
 
-    // Handle connection errors
+    // ✅ ERROR HANDLING
     socket.on('error', (error) => {
-      console.error(`🚫 Socket error for ${user.email}:`, error);
+      console.error(`❌ Socket error for ${user.email}:`, error);
     });
   });
 
-  // Global error handler
+  // ✅ GLOBAL ERROR HANDLER
   io.engine.on("connection_error", (err: any) => {
-    console.error('🚫 Socket.io connection error:', err.req || err);
-    console.error('🚫 Error code:', err.code);
-    console.error('🚫 Error message:', err.message);
-    console.error('🚫 Error context:', err.context);
+    console.error('🚫 Socket.io connection error:', {
+      code: err.code,
+      message: err.message,
+      context: err.context
+    });
   });
 
-  console.log('🚀 Socket.io server initialized');
+  // ✅ PERIODIC CLEANUP (every 5 minutes)
+  setInterval(() => {
+    const currentConnections = io.sockets.sockets.size;
+    const trackedConnections = userConnections.size;
+    
+    if (trackedConnections > currentConnections) {
+      console.log('🧹 Cleaning up stale connection tracking...');
+      
+      // Clean up stale entries
+      for (const [userId, socketId] of userConnections.entries()) {
+        if (!io.sockets.sockets.has(socketId)) {
+          userConnections.delete(userId);
+          socketUsers.delete(socketId);
+        }
+      }
+    }
+    
+    console.log(`📊 Connection stats: Total: ${currentConnections}, Tracked: ${userConnections.size}`);
+  }, 5 * 60 * 1000); // 5 minutes
+
+  console.log('🚀 Socket.io server initialized with enhanced room management');
   
-  // ✅ Set the IO instance for use in controllers
   setIO(io);
-  
   return io;
 };

@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { api, userLogin } from '../utils/api'; // userLogin ইমপোর্ট করুন
+import { api, userLogin } from '../utils/api';
 import { auth, googleProvider } from '../config/firebase';
 import { signInWithPopup, User as FirebaseUser } from 'firebase/auth';
+import socketService from '../config/socket';
 
 interface User {
   id: string;
-    _id?: string;
+  _id?: string;
   name: string;
   email: string;
   phone: string;
@@ -39,6 +40,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // ✅ SOCKET CONNECTION MANAGEMENT
+  useEffect(() => {
+    if (user && (user.id || user._id)) {
+      const userId = user.id || user._id;
+      console.log('🔌 Connecting socket for user:', userId);
+      
+      try {
+        
+        // Listen for booking status updates
+        socketService.onBookingStatusUpdate((data) => {
+          console.log('📋 Booking status update received:', data);
+          // You can add notification logic here
+        });
+
+        console.log('✅ Socket connected successfully for user:', userId);
+      } catch (error) {
+        console.error('❌ Socket connection failed:', error);
+      }
+    } else {
+      // Disconnect socket when no user
+      console.log('🔌 Disconnecting socket - no user');
+      socketService.disconnect();
+    }
+
+    // Cleanup on unmount or user change
+    return () => {
+      if (!user) {
+        socketService.disconnect();
+      }
+    };
+  }, [user]);
+
   useEffect(() => {
     checkAuth();
     
@@ -46,7 +79,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setCurrentUser(firebaseUser);
     });
 
-    return () => unsubscribe();
+    // ✅ CLEANUP ON UNMOUNT
+    return () => {
+      unsubscribe();
+      socketService.disconnect();
+    };
   }, []);
 
   const checkAuth = async () => {
@@ -60,20 +97,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       if (storedUser) {
-        // Use stored user data if available
         setUser(JSON.parse(storedUser));
         setLoading(false);
       } else {
-        // Fetch user data if not available
         const response = await api.get('/user-auth/me');
         setUser(response.user);
-        // Store user data for future use
         localStorage.setItem('user', JSON.stringify(response.user));
       }
     } catch (err) {
       console.error('Auth check error:', err);
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      socketService.disconnect(); // ✅ Disconnect on auth failure
     } finally {
       setLoading(false);
     }
@@ -87,18 +122,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setError(null);
       setLoading(true);
+      
       const response = await userLogin({ 
         identifier: identifier.trim(), 
         password,
         rememberMe 
       });
       
-      // Store token and user data
       localStorage.setItem('token', response.token);
       localStorage.setItem('user', JSON.stringify(response.user));
       localStorage.setItem('loginTime', Date.now().toString());
       
       setUser(response.user);
+      
+      // ✅ Socket will connect automatically via useEffect
+      console.log('✅ Login successful, socket will connect automatically');
+      
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'ইমেইল/ফোন বা পাসওয়ার্ড ভুল';
       setError(errorMessage);
@@ -114,6 +153,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(true);
       const response = await api.post('/user-auth/signup', { name, email, password });
       localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
       setUser(response.user);
     } catch (err) {
       setError('অ্যাকাউন্ট তৈরি করতে সমস্যা হয়েছে');
@@ -137,6 +177,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
       
       localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
       setUser(response.user);
     } catch (err) {
       setError('Google সাইন আপ ব্যর্থ হয়েছে');
@@ -180,21 +221,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('টোকেন প্রয়োজন');
+      
+      if (token) {
+        try {
+          await api.post('/user/logout', {}, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        } catch (err) {
+          console.warn('Logout API call failed, continuing with local cleanup');
+        }
       }
-      await api.post('/user/logout', {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      
       await auth.signOut();
       
-      // Clear all stored auth data
+      // ✅ PROPER CLEANUP
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('loginTime');
       
+      // Disconnect socket BEFORE setting user to null
+      socketService.disconnect();
+      
       setUser(null);
       setCurrentUser(null);
+      
+      console.log('✅ Logout successful, socket disconnected');
+      
     } catch (err) {
       console.error('Logout error:', err instanceof Error ? err.message : 'অজানা ত্রুটি');
       setError(err instanceof Error ? err.message : 'লগআউট করতে সমস্যা হয়েছে');
