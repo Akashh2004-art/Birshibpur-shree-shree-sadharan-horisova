@@ -69,13 +69,16 @@ export const userLogin = (data: {
   if (!data.identifier || !data.password) {
     throw new Error("আইডেন্টিফায়ার (ইমেইল/ফোন) এবং পাসওয়ার্ড দরকার");
   }
-  return request("/user/login", { data, method: "POST" });
+  // ✅ FIXED: Changed from "/user/login" to "/user-auth/login"
+  return request("/user-auth/login", { data, method: "POST" });
 };
 
+// ✅ Also fix other password-related routes if needed
 export const sendForgotPasswordRequest = (emailOrPhone: string) => {
   if (!emailOrPhone) {
     throw new Error("ইমেইল বা ফোন নম্বর দরকার");
   }
+  // Check if this should also be /user-auth instead of /user
   return request("/user/forgot-password", {
     data: { emailOrPhone },
     method: "POST",
@@ -86,6 +89,7 @@ export const verifyOTP = (emailOrPhone: string, otp: string) => {
   if (!emailOrPhone || !otp) {
     throw new Error("ইমেইল/ফোন এবং OTP দরকার");
   }
+  // Check if this should also be /user-auth instead of /user
   return request("/user/verify-otp", {
     data: { emailOrPhone, otp },
     method: "POST",
@@ -105,6 +109,7 @@ export const setNewPassword = (
     "Content-Type": "application/json",
   };
 
+  // Check if this should also be /user-auth instead of /user
   return request("/user/set-password", {
     data: {
       email: emailOrPhone,

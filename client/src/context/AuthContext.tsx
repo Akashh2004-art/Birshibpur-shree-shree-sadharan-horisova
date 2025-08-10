@@ -86,33 +86,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []);
 
-  const checkAuth = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const storedUser = localStorage.getItem('user');
-      
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-        setLoading(false);
-      } else {
-        const response = await api.get('/user-auth/me');
-        setUser(response.user);
-        localStorage.setItem('user', JSON.stringify(response.user));
-      }
-    } catch (err) {
-      console.error('Auth check error:', err);
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      socketService.disconnect(); // ✅ Disconnect on auth failure
-    } finally {
+const checkAuth = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+    
+    if (!token) {
       setLoading(false);
+      return;
     }
-  };
+
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+      setLoading(false);
+    } else {
+      // ✅ FIXED: Changed from '/user-auth/me' to match your server routes
+      const response = await api.get('/user-auth/me');
+      setUser(response.user);
+      localStorage.setItem('user', JSON.stringify(response.user));
+    }
+  } catch (err) {
+    console.error('Auth check error:', err);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    socketService.disconnect();
+  } finally {
+    setLoading(false);
+  }
+};
 
   const login = async (identifier: string, password: string, rememberMe: boolean = true) => {
     if (!identifier || !password) {
@@ -147,21 +148,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const signup = async (name: string, email: string, password: string) => {
-    try {
-      setError(null);
-      setLoading(true);
-      const response = await api.post('/user-auth/signup', { name, email, password });
-      localStorage.setItem('token', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
-      setUser(response.user);
-    } catch (err) {
-      setError('অ্যাকাউন্ট তৈরি করতে সমস্যা হয়েছে');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+const signup = async (name: string, email: string, password: string) => {
+  try {
+    setError(null);
+    setLoading(true);
+    // ✅ FIXED: Changed from '/user-auth/signup' to match your server routes
+    const response = await api.post('/user-auth/signup', { name, email, password });
+    localStorage.setItem('token', response.token);
+    localStorage.setItem('user', JSON.stringify(response.user));
+    setUser(response.user);
+  } catch (err) {
+    setError('অ্যাকাউন্ট তৈরি করতে সমস্যা হয়েছে');
+    throw err;
+  } finally {
+    setLoading(false);
+  }
+};
 
   const signUpWithGoogle = async (): Promise<void> => {
     try {
@@ -217,44 +219,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-      
-      if (token) {
-        try {
-          await api.post('/user/logout', {}, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-        } catch (err) {
-          console.warn('Logout API call failed, continuing with local cleanup');
-        }
+const logout = async () => {
+  try {
+    setLoading(true);
+    const token = localStorage.getItem('token');
+    
+    if (token) {
+      try {
+        // ✅ FIXED: Changed from '/user/logout' to '/user-auth/logout'
+        await api.post('/user-auth/logout', {}, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch (err) {
+        console.warn('Logout API call failed, continuing with local cleanup');
       }
-      
-      await auth.signOut();
-      
-      // ✅ PROPER CLEANUP
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('loginTime');
-      
-      // Disconnect socket BEFORE setting user to null
-      socketService.disconnect();
-      
-      setUser(null);
-      setCurrentUser(null);
-      
-      console.log('✅ Logout successful, socket disconnected');
-      
-    } catch (err) {
-      console.error('Logout error:', err instanceof Error ? err.message : 'অজানা ত্রুটি');
-      setError(err instanceof Error ? err.message : 'লগআউট করতে সমস্যা হয়েছে');
-      throw err;
-    } finally {
-      setLoading(false);
     }
-  };
+    
+    await auth.signOut();
+    
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('loginTime');
+    
+    socketService.disconnect();
+    
+    setUser(null);
+    setCurrentUser(null);
+    
+    console.log('✅ Logout successful, socket disconnected');
+    
+  } catch (err) {
+    console.error('Logout error:', err instanceof Error ? err.message : 'অজানা ত্রুটি');
+    setError(err instanceof Error ? err.message : 'লগআউট করতে সমস্যা হয়েছে');
+    throw err;
+  } finally {
+    setLoading(false);
+  }
+};
 
   const clearError = () => {
     setError(null);
