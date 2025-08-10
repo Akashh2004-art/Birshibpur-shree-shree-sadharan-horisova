@@ -1,6 +1,6 @@
-import { FC } from "react";
-import { signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "../config/firebase";
+import { FC, useEffect } from "react";
+import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from "firebase/auth";
+import { auth} from "../config/firebase";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
@@ -12,12 +12,27 @@ interface GoogleSignInButtonProps {
 const signUpWithGoogle: FC<GoogleSignInButtonProps> = ({ onSuccess, onError }) => {
   const navigate = useNavigate();
   
-  const handleGoogleSignIn = async () => {
-    try {
-      console.log("1️⃣ Starting Google Sign In...");
+  // Handle redirect result when component mounts
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          console.log("✅ Redirect sign-in successful:", result.user);
+          await processGoogleSignIn(result);
+        }
+      } catch (error) {
+        console.error("❌ Redirect sign-in error:", error);
+        const errorMessage = "Google সাইন ইন redirect ব্যর্থ হয়েছে। আবার চেষ্টা করুন!";
+        onError(errorMessage);
+      }
+    };
 
-      // Sign in with Google
-      const result = await signInWithPopup(auth, googleProvider);
+    handleRedirectResult();
+  }, []);
+
+  const processGoogleSignIn = async (result: any) => {
+    try {
       const { email, displayName } = result.user;
       console.log("2️⃣ Google Sign In Success:", { email, name: displayName });
 
@@ -25,8 +40,8 @@ const signUpWithGoogle: FC<GoogleSignInButtonProps> = ({ onSuccess, onError }) =
       const idToken = await result.user.getIdToken();
       console.log("3️⃣ 🔑 ID Token Received");
 
-      // Backend API URL
-      const apiUrl = "http://localhost:5000/api/user/google-signup";
+      // Backend API URL - Fixed the correct route
+      const apiUrl = "http://localhost:5000/api/user-auth/google-signup";
       console.log("4️⃣ Sending request to:", apiUrl);
       
       const response = await axios.post(
@@ -47,7 +62,7 @@ const signUpWithGoogle: FC<GoogleSignInButtonProps> = ({ onSuccess, onError }) =
         console.log("✅ Authentication successful, proceeding...");
         
         if (needsPassword) {
-          // Store temporary user data in localStorage or sessionStorage
+          // Store temporary user data in sessionStorage
           sessionStorage.setItem("tempUserData", JSON.stringify(tempUser || user));
           
           // Redirect to set password page
@@ -64,6 +79,52 @@ const signUpWithGoogle: FC<GoogleSignInButtonProps> = ({ onSuccess, onError }) =
         throw new Error(response.data.message || "Google সাইন আপ ব্যর্থ হয়েছে");
       }
     } catch (error: any) {
+      console.error("❌ Google sign-in processing error:", error);
+      const errorMessage = error.response?.data?.message || "Google সাইন আপ ব্যর্থ হয়েছে। আবার চেষ্টা করুন!";
+      onError(errorMessage);
+    }
+  };
+  
+  const handleGoogleSignIn = async () => {
+    try {
+      console.log("1️⃣ Starting Google Sign In...");
+
+      // Configure Google provider with additional settings
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      
+      // Set custom parameters to avoid popup issues
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+
+      let result;
+      
+      try {
+        // Try popup first
+        result = await signInWithPopup(auth, provider);
+        await processGoogleSignIn(result);
+      } catch (popupError: any) {
+        console.log("Popup failed, trying redirect method...", popupError.code);
+        
+        // If popup fails, use redirect method
+        if (
+          popupError.code === 'auth/popup-blocked' || 
+          popupError.code === 'auth/popup-closed-by-user' ||
+          popupError.code === 'auth/cancelled-popup-request'
+        ) {
+          console.log("🔄 Using redirect method...");
+          await signInWithRedirect(auth, provider);
+          // The result will be handled by useEffect when page reloads
+          return;
+        } else {
+          // For other errors, throw them
+          throw popupError;
+        }
+      }
+
+    } catch (error: any) {
       console.error("❌ Google sign-in error:", error);
       const errorMessage = error.response?.data?.message || "Google সাইন আপ ব্যর্থ হয়েছে। আবার চেষ্টা করুন!";
       onError(errorMessage);
@@ -74,7 +135,7 @@ const signUpWithGoogle: FC<GoogleSignInButtonProps> = ({ onSuccess, onError }) =
     <button
       type="button"
       onClick={handleGoogleSignIn}
-      className="w-full flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50"
+      className="w-full flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors duration-200"
     >
       <svg
         className="w-5 h-5"
