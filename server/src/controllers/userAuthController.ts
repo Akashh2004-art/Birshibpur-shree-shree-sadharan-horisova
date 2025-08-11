@@ -80,7 +80,7 @@ export const completeSignup = async (req: Request, res: Response) => {
   }
 };
 
-// 🚀 UPDATED: Google Sign Up / Sign In - Remove default fields
+// 🚀 FIXED: Google Sign Up with consistent token structure
 export const googleSignUp = async (
   req: Request,
   res: Response
@@ -104,10 +104,15 @@ export const googleSignUp = async (
     let user = await User.findOne({ email });
 
     if (user) {
+      // 🚀 FIXED: Consistent token structure with email field
       const token = jwt.sign(
-        { id: user._id },
+        { 
+          id: user._id,
+          email: user.email, // 🔧 Changed from 'identifier' to 'email'
+          role: user.role || 'user' // 🔧 Added role field
+        },
         process.env.JWT_SECRET || "akashsaha0751",
-        { expiresIn: "365d" } // 1 বছরের জন্য টোকেন বৈধ থাকবে
+        { expiresIn: "365d" }
       );
 
       res.status(200).json({
@@ -141,7 +146,7 @@ export const googleSignUp = async (
   }
 };
 
-// 🚀 UPDATED: Complete Google Sign Up - Remove default fields
+// 🚀 FIXED: Complete Google Sign Up with consistent token structure
 export const completeGoogleSignUp = async (
   req: Request,
   res: Response
@@ -180,10 +185,15 @@ export const completeGoogleSignUp = async (
     // নোটিফিকেশন তৈরি করুন
     await createSignupNotification(email);
     
+    // 🚀 FIXED: Consistent token structure with email field
     const token = jwt.sign(
-      { id: newUser._id },
+      { 
+        id: newUser._id,
+        email: newUser.email, // 🔧 Changed from just 'id' to include 'email'
+        role: newUser.role || 'user' // 🔧 Added role field
+      },
       process.env.JWT_SECRET || "akashsaha0751",
-      { expiresIn: "365d" } // 1 বছরের জন্য টোকেন বৈধ থাকবে
+      { expiresIn: "365d" }
     );
     
     res.status(201).json({
@@ -232,12 +242,12 @@ export const setPassword = async (req: Request, res: Response) => {
   }
 };
 
-// ✅ User Login
+// 🚀 FIXED: User Login with consistent token structure
 export const login = async (req: Request, res: Response) => {
   try {
     const { identifier, password } = req.body;
 
-    console.log("📢 ইযার লগইন রিকোয়েস্ট (RAW):", {
+    console.log("📢 ইউজার লগইন রিকোয়েস্ট (RAW):", {
       identifier,
       hasPassword: !!password,
     });
@@ -252,7 +262,7 @@ export const login = async (req: Request, res: Response) => {
     }
 
     const trimmedIdentifier = identifier.trim();
-    console.log("📢 ইযার লগইন রিকোয়েস্ট (TRIMMED):", {
+    console.log("📢 ইউজার লগইন রিকোয়েস্ট (TRIMMED):", {
       identifier: trimmedIdentifier,
       hasPassword: !!password,
     });
@@ -274,14 +284,14 @@ export const login = async (req: Request, res: Response) => {
     }
 
     if (!user) {
-      console.log("❌ ইযার পাওয়া যায়নি:", trimmedIdentifier);
+      console.log("❌ ইউজার পাওয়া যায়নি:", trimmedIdentifier);
       return res
         .status(401)
-        .json({ success: false, message: "ইযার খুঁজে পাওয়া যায়নি" });
+        .json({ success: false, message: "ইউজার খুঁজে পাওয়া যায়নি" });
     }
 
     console.log(
-      "📢 ইযার পাওয়া গেছে, পাসওয়ার্ড:",
+      "📢 ইউজার পাওয়া গেছে, পাসওয়ার্ড:",
       user.password ? "Set" : "Not Set"
     );
 
@@ -300,8 +310,13 @@ export const login = async (req: Request, res: Response) => {
         .json({ success: false, message: "পাসওয়ার্ড মিলছে না" });
     }
 
+    // 🚀 FIXED: Consistent token structure - changed 'identifier' to 'email'
     const token = jwt.sign(
-      { id: user._id, identifier: user.email || user.phone, role: user.role },
+      { 
+        id: user._id, 
+        email: user.email || user.phone, // 🔧 Changed from 'identifier' to 'email'
+        role: user.role || 'user' // 🔧 Added default role
+      },
       process.env.JWT_SECRET || "akashsaha0751",
       { expiresIn: "365d" }
     );
@@ -317,7 +332,7 @@ export const login = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error("❌ ইযার লগইন এরর:", error);
+    console.error("❌ ইউজার লগইন এরর:", error);
     res.status(500).json({ success: false, message: "সার্ভারে সমস্যা" });
   }
 };
