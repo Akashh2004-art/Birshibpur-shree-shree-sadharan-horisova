@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api, userLogin } from '../utils/api';
 import { auth, googleProvider } from '../config/firebase';
 import { signInWithPopup, User as FirebaseUser } from 'firebase/auth';
-import socketService from '../config/socket';
+import bookingSocketService from '../config/socket';
 
 interface User {
   id: string;
@@ -40,37 +40,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ SOCKET CONNECTION MANAGEMENT
-  useEffect(() => {
-    if (user && (user.id || user._id)) {
-      const userId = user.id || user._id;
-      console.log('🔌 Connecting socket for user:', userId);
-      
-      try {
-        
-        // Listen for booking status updates
-        socketService.onBookingStatusUpdate((data) => {
-          console.log('📋 Booking status update received:', data);
-          // You can add notification logic here
-        });
-
-        console.log('✅ Socket connected successfully for user:', userId);
-      } catch (error) {
-        console.error('❌ Socket connection failed:', error);
-      }
-    } else {
-      // Disconnect socket when no user
-      console.log('🔌 Disconnecting socket - no user');
-      socketService.disconnect();
-    }
-
-    // Cleanup on unmount or user change
-    return () => {
-      if (!user) {
-        socketService.disconnect();
-      }
-    };
-  }, [user]);
+  // ✅ REMOVED SOCKET CONNECTION MANAGEMENT FROM AUTH CONTEXT
+  // Socket connections are now handled per booking in Booking.tsx
+  // No global socket connection needed in AuthContext anymore
 
   useEffect(() => {
     checkAuth();
@@ -79,10 +51,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setCurrentUser(firebaseUser);
     });
 
-    // ✅ CLEANUP ON UNMOUNT
+    // ✅ CLEANUP ON UNMOUNT - Only disconnect all booking connections
     return () => {
       unsubscribe();
-      socketService.disconnect();
+      // Only disconnect all bookings when app is closing
+      bookingSocketService.disconnectAll();
     };
   }, []);
 
@@ -109,7 +82,8 @@ const checkAuth = async () => {
     console.error('Auth check error:', err);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    socketService.disconnect();
+    // Only disconnect booking connections on auth failure
+    bookingSocketService.disconnectAll();
   } finally {
     setLoading(false);
   }
@@ -136,8 +110,8 @@ const checkAuth = async () => {
       
       setUser(response.user);
       
-      // ✅ Socket will connect automatically via useEffect
-      console.log('✅ Login successful, socket will connect automatically');
+      // ✅ NO GLOBAL SOCKET CONNECTION - Booking sockets connect per booking
+      console.log('✅ Login successful, booking sockets will connect per booking');
       
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'ইমেইল/ফোন বা পাসওয়ার্ড ভুল';
@@ -241,12 +215,13 @@ const logout = async () => {
     localStorage.removeItem('user');
     localStorage.removeItem('loginTime');
     
-    socketService.disconnect();
+    // ✅ DISCONNECT ALL BOOKING CONNECTIONS ON LOGOUT
+    bookingSocketService.disconnectAll();
     
     setUser(null);
     setCurrentUser(null);
     
-    console.log('✅ Logout successful, socket disconnected');
+    console.log('✅ Logout successful, all booking sockets disconnected');
     
   } catch (err) {
     console.error('Logout error:', err instanceof Error ? err.message : 'অজানা ত্রুটি');

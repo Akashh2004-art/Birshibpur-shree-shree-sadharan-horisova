@@ -1,197 +1,306 @@
 import { io, Socket } from 'socket.io-client';
 
-class SocketService {
-  private socket: Socket | null = null;
-  private userId: string | null = null;
-  private serverUrl: string = '';
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
+interface BookingSocketConnection {
+  socket: Socket;
+  bookingId: string;
+  userId: string;
+  endTime: Date;
+  cleanup: () => void;
+}
 
-  connect(userId?: string): Socket {
-    // ✅ PREVENT MULTIPLE CONNECTIONS
-    if (this.socket?.connected && this.userId === userId) {
-      console.log('✅ Using existing socket connection for user:', userId);
-      return this.socket;
+class BookingSocketService {
+  private activeConnections: Map<string, BookingSocketConnection> = new Map();
+  private serverUrl: string = '';
+  private maxConcurrentConnections = 1000; // Support for large scale
+
+  constructor() {
+    this.serverUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+    
+    // Cleanup on page unload
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', () => {
+        this.disconnectAll();
+      });
+    }
+  }
+
+  /**
+   * 🔥 START BOOKING SOCKET CONNECTION
+   * Only called when user submits a booking
+   */
+  async connectForBooking(bookingId: string, userId: string, bookingEndTime: Date): Promise<Socket> {
+    // Check if already connected for this booking
+    if (this.activeConnections.has(bookingId)) {
+      console.log(`✅ Using existing connection for booking: ${bookingId}`);
+      return this.activeConnections.get(bookingId)!.socket;
     }
 
-    // ✅ DISCONNECT PREVIOUS CONNECTION
-    if (this.socket) {
-      console.log('🔄 Disconnecting previous socket connection');
-      this.disconnect();
+    // Check max connections limit
+    if (this.activeConnections.size >= this.maxConcurrentConnections) {
+      throw new Error('🚫 Maximum concurrent connections reached. Please try again later.');
     }
 
     const token = localStorage.getItem('token');
-    
     if (!token) {
-      console.error('❌ No token found, cannot connect socket');
-      throw new Error('Authentication token required');
+      throw new Error('❌ Authentication token required for booking connection');
     }
 
-    this.serverUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
-    
-    console.log('🔌 Connecting to socket server:', this.serverUrl);
-    
-    // ✅ CREATE NEW CONNECTION WITH PROPER CONFIG
-    this.socket = io(this.serverUrl, {
+    console.log(`🔌 Creating booking socket connection for: ${bookingId}`);
+
+    // Create new socket for this specific booking
+    const socket = io(this.serverUrl, {
       transports: ['websocket', 'polling'],
       timeout: 20000,
       reconnection: true,
-      reconnectionAttempts: this.maxReconnectAttempts,
-      reconnectionDelay: 1000,
-      forceNew: true, // Force new connection
+      reconnectionAttempts: 3,
+      reconnectionDelay: 2000,
+      forceNew: true,
       auth: {
-        token: token
+        token: token,
+        bookingId: bookingId,
+        userId: userId,
+        connectionType: 'booking'
       }
     });
 
-    // ✅ CONNECTION EVENT HANDLERS
-    this.socket.on('connect', () => {
-      console.log('✅ Socket connected:', this.socket?.id);
-      this.reconnectAttempts = 0;
+    // Setup connection handlers
+    const connectionPromise = new Promise<Socket>((resolve, reject) => {
+      const connectionTimeout = setTimeout(() => {
+        socket.disconnect();
+        reject(new Error('🚫 Booking socket connection timeout'));
+      }, 15000);
+
+      socket.on('connect', () => {
+        clearTimeout(connectionTimeout);
+        console.log(`✅ Booking socket connected: ${socket.id} for booking: ${bookingId}`);
+        
+        // Join booking-specific room
+        socket.emit('join-booking-room', { bookingId, userId });
+        resolve(socket);
+      });
+
+      socket.on('connect_error', (error) => {
+        clearTimeout(connectionTimeout);
+        console.error(`❌ Booking socket connection error for ${bookingId}:`, error);
+        reject(error);
+      });
+    });
+
+    try {
+      const connectedSocket = await connectionPromise;
       
-      if (userId) {
-        this.userId = userId;
-        this.joinUserRoom(userId);
+      // Setup booking-specific event handlers
+      this.setupBookingEventHandlers(connectedSocket, bookingId, userId);
+      
+      // Create cleanup function
+      const cleanup = () => this.disconnectBooking(bookingId);
+      
+      // Store connection info
+      const connectionInfo: BookingSocketConnection = {
+        socket: connectedSocket,
+        bookingId,
+        userId,
+        endTime: bookingEndTime,
+        cleanup
+      };
+      
+      this.activeConnections.set(bookingId, connectionInfo);
+      
+      // Auto disconnect when booking ends
+      this.scheduleAutoDisconnect(bookingId, bookingEndTime);
+      
+      console.log(`📊 Active booking connections: ${this.activeConnections.size}`);
+      
+      return connectedSocket;
+
+    } catch (error) {
+      console.error(`🚫 Failed to connect booking socket for ${bookingId}:`, error);
+      socket.disconnect();
+      throw error;
+    }
+  }
+
+  /**
+   * 🎯 SETUP BOOKING-SPECIFIC EVENT HANDLERS
+   */
+  private setupBookingEventHandlers(socket: Socket, bookingId: string, _userId: string): void {
+    // Handle booking status updates
+    socket.on('booking_status_update', (data) => {
+      console.log(`📋 Booking status update for ${bookingId}:`, data);
+      
+      // If booking is rejected, disconnect immediately
+      if (data.status === 'rejected') {
+        console.log(`❌ Booking ${bookingId} rejected, disconnecting...`);
+        this.disconnectBooking(bookingId);
       }
     });
 
-    this.socket.on('disconnect', (reason) => {
-      console.log('❌ Socket disconnected:', reason);
-      
-      // Don't auto-reconnect on manual disconnect
-      if (reason === 'io client disconnect') {
-        console.log('🚫 Manual disconnect, not reconnecting');
-      }
+    // Handle admin acceptance
+    socket.on('booking_accepted', (data) => {
+      console.log(`✅ Booking ${bookingId} accepted:`, data);
+      // Keep connection alive for real-time updates
     });
 
-    this.socket.on('connect_error', (error) => {
-      console.error('❌ Socket connection error:', error);
-      this.reconnectAttempts++;
-      
-      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-        console.error('🚫 Max reconnection attempts reached');
-        this.disconnect();
-      }
+    // Handle booking completion
+    socket.on('booking_completed', (data) => {
+      console.log(`🎉 Booking ${bookingId} completed:`, data);
+      this.disconnectBooking(bookingId);
     });
 
-    this.socket.on('error', (error) => {
-      console.error('🚫 Socket error:', error);
+    // Handle disconnect
+    socket.on('disconnect', (reason) => {
+      console.log(`❌ Booking socket disconnected for ${bookingId}:`, reason);
+      this.activeConnections.delete(bookingId);
     });
 
-    // ✅ ROOM JOIN CONFIRMATIONS
-    this.socket.on('user-room-joined', (data) => {
-      console.log('✅ Successfully joined user room:', data);
+    // Handle errors
+    socket.on('error', (error) => {
+      console.error(`🚫 Booking socket error for ${bookingId}:`, error);
     });
 
-    this.socket.on('user-room-left', (data) => {
-      console.log('✅ Successfully left user room:', data);
+    // Room join confirmation
+    socket.on('booking_room_joined', (data) => {
+      console.log(`✅ Joined booking room for ${bookingId}:`, data);
     });
-
-    return this.socket;
   }
 
-  disconnect(): void {
-    if (this.socket) {
-      console.log('🔌 Disconnecting socket...');
-      
-      // ✅ CLEAN DISCONNECT
-      if (this.userId) {
-        this.leaveUserRoom();
-      }
-      
-      // Remove all listeners to prevent memory leaks
-      this.socket.removeAllListeners();
-      
-      // Disconnect
-      this.socket.disconnect();
-      this.socket = null;
-      this.userId = null;
-      this.reconnectAttempts = 0;
-      
-      console.log('✅ Socket disconnected and cleaned up');
+  /**
+   * ⏰ SCHEDULE AUTO DISCONNECT
+   */
+  private scheduleAutoDisconnect(bookingId: string, endTime: Date): void {
+    const now = new Date();
+    const timeUntilEnd = endTime.getTime() - now.getTime();
+    
+    if (timeUntilEnd > 0) {
+      setTimeout(() => {
+        console.log(`⏰ Auto-disconnecting booking ${bookingId} - time ended`);
+        this.disconnectBooking(bookingId);
+      }, timeUntilEnd);
     }
   }
 
-  isConnected(): boolean {
-    return this.socket?.connected || false;
-  }
-
-  // ✅ USER ROOM MANAGEMENT
-  joinUserRoom(userId: string): void {
-    if (!this.socket?.connected) {
-      console.warn('⚠️ Socket not connected, cannot join user room');
-      return;
-    }
-
-    this.userId = userId;
-    console.log('👤 Joining user room for:', userId);
-    this.socket.emit('join-user-room', userId);
-  }
-
-  leaveUserRoom(): void {
-    if (!this.socket?.connected || !this.userId) {
-      return;
-    }
-
-    console.log('👤 Leaving user room for:', this.userId);
-    this.socket.emit('leave-user-room', this.userId);
-  }
-
-  // ✅ BOOKING STATUS UPDATES
-  onBookingStatusUpdate(callback: (data: any) => void): void {
-    if (!this.socket) {
-      console.warn('⚠️ Socket not connected, cannot listen for booking updates');
-      return;
-    }
-
-    this.socket.on('bookingStatusUpdate', callback);
-    console.log('📋 Listening for booking status updates');
-  }
-
-  offBookingStatusUpdate(): void {
-    if (this.socket) {
-      this.socket.off('bookingStatusUpdate');
-      console.log('📋 Stopped listening for booking status updates');
+  /**
+   * 🔌 DISCONNECT SPECIFIC BOOKING
+   */
+  disconnectBooking(bookingId: string): void {
+    const connection = this.activeConnections.get(bookingId);
+    
+    if (connection) {
+      console.log(`🔌 Disconnecting booking socket: ${bookingId}`);
+      
+      // Leave booking room
+      connection.socket.emit('leave-booking-room', { 
+        bookingId: connection.bookingId, 
+        userId: connection.userId 
+      });
+      
+      // Remove all listeners
+      connection.socket.removeAllListeners();
+      
+      // Disconnect socket
+      connection.socket.disconnect();
+      
+      // Remove from active connections
+      this.activeConnections.delete(bookingId);
+      
+      console.log(`✅ Booking ${bookingId} disconnected. Active connections: ${this.activeConnections.size}`);
     }
   }
 
-  // ✅ CONNECTION INFO
-  getConnectionInfo() {
+  /**
+   * 🧹 DISCONNECT ALL CONNECTIONS
+   */
+  disconnectAll(): void {
+    console.log(`🧹 Disconnecting all booking sockets (${this.activeConnections.size})`);
+    
+    for (const [, connection] of this.activeConnections) {
+      connection.cleanup();
+    }
+    
+    this.activeConnections.clear();
+    console.log('✅ All booking sockets disconnected');
+  }
+
+  /**
+   * 📊 GET CONNECTION STATUS
+   */
+  getBookingConnection(bookingId: string): BookingSocketConnection | null {
+    return this.activeConnections.get(bookingId) || null;
+  }
+
+  /**
+   * 🔍 CHECK IF BOOKING IS CONNECTED
+   */
+  isBookingConnected(bookingId: string): boolean {
+    const connection = this.activeConnections.get(bookingId);
+    return connection?.socket.connected || false;
+  }
+
+  /**
+   * 📈 GET ACTIVE CONNECTIONS INFO
+   */
+  getActiveConnectionsInfo() {
+    const connections = Array.from(this.activeConnections.entries()).map(([bookingId, conn]) => ({
+      bookingId,
+      userId: conn.userId,
+      connected: conn.socket.connected,
+      socketId: conn.socket.id,
+      endTime: conn.endTime
+    }));
+
     return {
-      connected: this.isConnected(),
-      socketId: this.socket?.id || null,
-      userId: this.userId,
-      serverUrl: this.serverUrl,
-      reconnectAttempts: this.reconnectAttempts
+      totalActive: this.activeConnections.size,
+      maxAllowed: this.maxConcurrentConnections,
+      connections
     };
   }
 
-  // ✅ HEARTBEAT FOR CONNECTION HEALTH
-  ping(callback?: () => void): void {
-    if (!this.socket?.connected) {
-      console.warn('⚠️ Socket not connected, cannot ping');
-      return;
+  /**
+   * 🎯 EMIT TO SPECIFIC BOOKING
+   */
+  emitToBooking(bookingId: string, event: string, data: any): boolean {
+    const connection = this.activeConnections.get(bookingId);
+    
+    if (connection?.socket.connected) {
+      connection.socket.emit(event, data);
+      return true;
     }
-
-    this.socket.emit('ping', (response: string) => {
-      console.log('🏓 Socket ping response:', response);
-      if (callback) callback();
-    });
+    
+    console.warn(`⚠️ Cannot emit to booking ${bookingId} - not connected`);
+    return false;
   }
 
-  getSocket(): Socket | null {
-    return this.socket;
+  /**
+   * 👂 LISTEN TO BOOKING EVENTS
+   */
+  onBookingEvent(bookingId: string, event: string, callback: (data: any) => void): boolean {
+    const connection = this.activeConnections.get(bookingId);
+    
+    if (connection?.socket) {
+      connection.socket.on(event, callback);
+      return true;
+    }
+    
+    console.warn(`⚠️ Cannot listen to booking ${bookingId} events - not connected`);
+    return false;
+  }
+
+  /**
+   * 🚫 STOP LISTENING TO BOOKING EVENTS
+   */
+  offBookingEvent(bookingId: string, event: string): boolean {
+    const connection = this.activeConnections.get(bookingId);
+    
+    if (connection?.socket) {
+      connection.socket.off(event);
+      return true;
+    }
+    
+    return false;
   }
 }
 
-// ✅ SINGLETON INSTANCE
-const socketService = new SocketService();
+// 🎯 SINGLETON INSTANCE
+const bookingSocketService = new BookingSocketService();
 
-// ✅ CLEANUP ON PAGE UNLOAD
-if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', () => {
-    socketService.disconnect();
-  });
-}
-
-export default socketService;
+export default bookingSocketService;

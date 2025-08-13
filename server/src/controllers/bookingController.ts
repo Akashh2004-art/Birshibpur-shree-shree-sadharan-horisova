@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import Booking, { IBooking } from '../models/bookingModel';
 import Admin from '../models/adminModel';
 import { sendEmail } from '../utils/emailService';
-import { io } from '../app';
+import { emitToBookingRoom, emitToAdminRoom } from '../config/socket.config';
 
 export const createBooking = async (req: Request, res: Response) => {
   try {
@@ -86,18 +86,17 @@ export const createBooking = async (req: Request, res: Response) => {
 
     await newBooking.save();
 
-    // Real-time notification to admins
-    if (io) {
-      io.to('admin-room').emit('newBooking', {
-        bookingId: newBooking._id.toString(),
-        userName: name,
-        userEmail: email,
-        serviceName,
-        date: bookingDate.toISOString(),
-        time,
-        message: message || ''
-      });
-    }
+    // ✅ FIXED: Real-time notification to admins using new utility function
+    emitToAdminRoom('newBooking', {
+      bookingId: newBooking._id.toString(),
+      userName: name,
+      userEmail: email,
+      serviceName,
+      date: bookingDate.toISOString(),
+      time,
+      message: message || '',
+      timestamp: new Date().toISOString()
+    });
 
     // Send email to admins
     try {
@@ -214,25 +213,55 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
 
     await booking.save();
 
-    // Real-time notification to user
-    if (io) {
-      io.to(`user-${booking.userId}`).emit('bookingStatusUpdate', {
-        bookingId: booking._id.toString(),
-        status: booking.status,
+    // ✅ FIXED: Real-time notification to booking-specific room (matches client events)
+    const bookingId = booking._id.toString();
+    
+    if (status === 'approved') {
+      // Send booking_accepted event to booking room
+      emitToBookingRoom(bookingId, 'booking_accepted', {
+        bookingId,
+        status: 'approved',
         serviceName: booking.serviceName,
+        userName: booking.userName,
         date: booking.date.toISOString(),
         time: booking.time,
-        rejectionReason: booking.rejectionReason
+        message: 'আপনার বুকিং অনুমোদিত হয়েছে!',
+        timestamp: new Date().toISOString()
       });
-
-      // Notify admins about the update
-      io.to('admin-room').emit('bookingStatusUpdate', {
-        bookingId: booking._id.toString(),
-        status: booking.status,
+    } else if (status === 'rejected') {
+      // Send booking_rejected event to booking room
+      emitToBookingRoom(bookingId, 'booking_rejected', {
+        bookingId,
+        status: 'rejected',
         serviceName: booking.serviceName,
-        userName: booking.userName
+        userName: booking.userName,
+        date: booking.date.toISOString(),
+        time: booking.time,
+        rejectionReason: booking.rejectionReason || 'কোনো কারণ উল্লেখ করা হয়নি',
+        message: 'দুঃখিত, আপনার বুকিং বাতিল করা হয়েছে',
+        timestamp: new Date().toISOString()
       });
     }
+
+    // ✅ FIXED: Send booking_status_update to booking room (matches client listener)
+    emitToBookingRoom(bookingId, 'booking_status_update', {
+      bookingId,
+      status: booking.status,
+      serviceName: booking.serviceName,
+      date: booking.date.toISOString(),
+      time: booking.time,
+      rejectionReason: booking.rejectionReason,
+      timestamp: new Date().toISOString()
+    });
+
+    // Notify admins about the update
+    emitToAdminRoom('bookingStatusUpdate', {
+      bookingId,
+      status: booking.status,
+      serviceName: booking.serviceName,
+      userName: booking.userName,
+      timestamp: new Date().toISOString()
+    });
 
     // Send email notification to user
     const statusText = status === 'approved' ? 'অনুমোদিত' : 'বাতিল';
@@ -366,14 +395,13 @@ export const deleteBooking = async (req: Request, res: Response) => {
 
     await Booking.findByIdAndDelete(id);
 
-    // Notify admins about deletion
-    if (io) {
-      io.to('admin-room').emit('bookingDeleted', {
-        bookingId: id,
-        serviceName: booking.serviceName,
-        userName: booking.userName
-      });
-    }
+    // ✅ FIXED: Notify admins about deletion using utility function
+    emitToAdminRoom('bookingDeleted', {
+      bookingId: id,
+      serviceName: booking.serviceName,
+      userName: booking.userName,
+      timestamp: new Date().toISOString()
+    });
 
     res.json({
       success: true,
@@ -490,7 +518,6 @@ export const getBookingStats = async (req: Request, res: Response) => {
     });
   }
 };
-
 
 export const getCurrentBookingStatus = async (req: Request, res: Response) => {
   try {
