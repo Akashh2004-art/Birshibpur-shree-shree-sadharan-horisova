@@ -5,9 +5,9 @@ import GoogleSignInButton from '../components/signUpWithGoogle';
 
 const Signup = () => {
   const navigate = useNavigate();
-  useAuth();
+  useAuth(); // Just for context, don't destructure anything
   const [error, setError] = useState('');
-  const [, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleGoogleSignup = async (userData: any) => {
     try {
@@ -23,10 +23,24 @@ const Signup = () => {
           }
         });
       } else {
-        // If no password needed, go to home
-        navigate('/');
+        // ✅ SIMPLE SOLUTION: 
+        // 1. Clear any existing auth data (signup complete but not logged in yet)
+        // 2. Just redirect to login page
+        // 3. Let user manually login from login page
+        
+        // Clear any stored data from signup process
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('loginTime');
+        
+        // Show success message and redirect to login
+        alert('✅ সাইন আপ সফল হয়েছে! এখন লগইন করুন।');
+        
+        // Direct redirect to login page
+        navigate('/login');
       }
     } catch (err) {
+      console.error('Google signup error:', err);
       setError('Google সাইন আপ ব্যর্থ হয়েছে। আবার চেষ্টা করুন!');
     } finally {
       setLoading(false);
@@ -49,6 +63,13 @@ const Signup = () => {
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             {error}
+          </div>
+        )}
+
+        {loading && (
+          <div className="text-center mb-4">
+            <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-orange-500"></div>
+            <p className="mt-2 text-gray-600">প্রক্রিয়াধীন...</p>
           </div>
         )}
 

@@ -34,22 +34,20 @@ const SetPassword = () => {
       console.log("📞 ফোন নম্বর চেক করা শুরু...", number);
 
       try {
-        // Fixed API URL - using correct route
         const response = await axios.post('http://localhost:5000/api/user-auth/check-phone', { 
           phone: `+91${number}` 
         });
         console.log("✅ ফোন নম্বর চেক করা শেষ! সার্ভার রেসপন্স:", response.data);
-        setPhoneValid(!response.data.exists); // যদি ডাটাবেসে না থাকে, তবে বৈধ
+        setPhoneValid(!response.data.exists);
         
         if (response.data.exists) {
           setError('এই ফোন নম্বরটি ইতিমধ্যে ব্যবহৃত হয়েছে');
         } else {
-          setError(''); // Clear error if phone is available
+          setError('');
         }
       } catch (err: any) {
         console.error('❌ ফোন নম্বর চেকিং এ সমস্যা:', err);
         setPhoneValid(false);
-        // Don't show error for phone checking unless it's a serious issue
         if (err.response?.status !== 404) {
           setError('ফোন নম্বর যাচাই করতে সমস্যা হয়েছে');
         }
@@ -87,7 +85,6 @@ const SetPassword = () => {
         throw new Error('No email found');
       }
       
-      // Fixed API URL - using correct route
       const response = await axios.post('http://localhost:5000/api/user-auth/complete-google-signup', {
         ...tempUserData,
         phone: `+91${phone}`,
@@ -95,13 +92,20 @@ const SetPassword = () => {
       });
       
       if (response.data.success) {
+        // Clear session storage
         sessionStorage.removeItem('tempUserData');
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        localStorage.setItem('loginTime', Date.now().toString());
         
-        setSuccessMessage('🎉 পাসওয়ার্ড সফলভাবে সেট হয়েছে!');
-        setTimeout(() => navigate('/'), 1800); // Redirect to home instead of login
+        // ✅ SIMPLE SOLUTION: 
+        // 1. DON'T store token/user in localStorage 
+        // 2. Just show success message and redirect to login
+        // 3. User will need to manually login
+        
+        setSuccessMessage('🎉 পাসওয়ার্ড সফলভাবে সেট হয়েছে! এখন লগইন করুন।');
+        
+        setTimeout(() => {
+          navigate('/login'); // ✅ Simple redirect to login
+        }, 2000);
+        
       } else {
         throw new Error(response.data.message || 'সাইন আপ সম্পূর্ণ করতে সমস্যা হয়েছে');
       }
@@ -155,7 +159,7 @@ const SetPassword = () => {
                 className="flex-1 px-3 py-3 border-none focus:ring-0 focus:outline-none text-gray-800 placeholder-gray-400"
                 value={phone} 
                 onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, ''); // Only allow digits
+                  const value = e.target.value.replace(/\D/g, '');
                   setPhone(value);
                   if (value.length === 10) {
                     checkPhoneNumber(value);
