@@ -162,4 +162,4 @@ export const authenticateAdmin = async (
 };
 
 // ✅ FIXED: Alias for backward compatibility (if you used authenticateWT somewhere)
-export const authenticateWT = authenticateToken;
+export const authMiddleware = authenticateToken;

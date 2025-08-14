@@ -16,7 +16,7 @@ import authRoutes from "./routes/authRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import passwordRoutes from "./routes/passwordRoutes";
 import userAuthRoutes from "./routes/userAuthRoutes";
-import userPasswordRoutes from "./routes/userPasswordRoutes";
+// ❌ REMOVED: import userPasswordRoutes from "./routes/userPasswordRoutes";
 import notificationRoutes from "./routes/notificationRoutes";
 import dashboardRoutes from "./routes/dashboardRoutes";
 import eventRoutes from "./routes/eventRoutes";
@@ -126,7 +126,7 @@ const startServer = async () => {
     app.use("/api/auth", authRoutes);
     app.use("/api/admin", adminRoutes);
     app.use("/api/password", passwordRoutes);
-    app.use("/api/user", userPasswordRoutes);
+    // ❌ REMOVED: app.use("/api/user", userPasswordRoutes);
     app.use("/api/notifications", notificationRoutes);
     app.use("/api/dashboard", dashboardRoutes);
     app.use("/api/events", eventRoutes);

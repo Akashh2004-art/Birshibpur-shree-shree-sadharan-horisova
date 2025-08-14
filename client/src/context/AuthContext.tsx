@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { api, userLogin } from '../utils/api';
-import { auth, googleProvider } from '../config/firebase';
-import { signInWithPopup, User as FirebaseUser } from 'firebase/auth';
+import { api } from '../utils/api';
+import { auth } from '../config/firebase';
+import { User as FirebaseUser } from 'firebase/auth';
 import bookingSocketService from '../config/socket';
 
 interface User {
@@ -9,7 +9,7 @@ interface User {
   _id?: string;
   name: string;
   email: string;
-  phone: string;
+  phone?: string;
   isAdmin: boolean;
   photoURL?: string;
 }
@@ -19,13 +19,9 @@ interface AuthContextType {
   currentUser: FirebaseUser | null;
   loading: boolean;
   error: string | null;
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
-  signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
-  signUpWithGoogle: (userData: any) => Promise<void>;
-  signUpWithPhone: (phone: string) => Promise<void>;
-  setCustomPassword: (email: string, password: string) => Promise<void>;
+  loginWithGoogleToken: (token: string, userData: any) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,10 +36,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ REMOVED SOCKET CONNECTION MANAGEMENT FROM AUTH CONTEXT
-  // Socket connections are now handled per booking in Booking.tsx
-  // No global socket connection needed in AuthContext anymore
-
   useEffect(() => {
     checkAuth();
     
@@ -51,70 +43,59 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setCurrentUser(firebaseUser);
     });
 
-    // ✅ CLEANUP ON UNMOUNT - Only disconnect all booking connections
     return () => {
       unsubscribe();
-      // Only disconnect all bookings when app is closing
+      // Disconnect all booking connections when app unmounts
       bookingSocketService.disconnectAll();
     };
   }, []);
 
-const checkAuth = async () => {
-  try {
-    const token = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-    
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+  const checkAuth = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const storedUser = localStorage.getItem('user');
+      
+      if (!token) {
+        setLoading(false);
+        return;
+      }
 
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+        setLoading(false);
+      } else {
+        // Validate token with server
+        const response = await api.get('/user-auth/me');
+        setUser(response.user);
+        localStorage.setItem('user', JSON.stringify(response.user));
+      }
+    } catch (err) {
+      console.error('Auth check error:', err);
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('loginTime');
+      bookingSocketService.disconnectAll();
+    } finally {
       setLoading(false);
-    } else {
-      // ✅ FIXED: Changed from '/user-auth/me' to match your server routes
-      const response = await api.get('/user-auth/me');
-      setUser(response.user);
-      localStorage.setItem('user', JSON.stringify(response.user));
     }
-  } catch (err) {
-    console.error('Auth check error:', err);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    // Only disconnect booking connections on auth failure
-    bookingSocketService.disconnectAll();
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
-  const login = async (identifier: string, password: string, rememberMe: boolean = true) => {
-    if (!identifier || !password) {
-      throw new Error('ইমেইল/ফোন এবং পাসওয়ার্ড দরকার');
-    }
-  
+  // ✅ NEW: Google token login method for signUpWithGoogle component
+  const loginWithGoogleToken = async (token: string, userData: any) => {
     try {
       setError(null);
       setLoading(true);
       
-      const response = await userLogin({ 
-        identifier: identifier.trim(), 
-        password,
-        rememberMe 
-      });
-      
-      localStorage.setItem('token', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('loginTime', Date.now().toString());
       
-      setUser(response.user);
+      setUser(userData);
       
-      // ✅ NO GLOBAL SOCKET CONNECTION - Booking sockets connect per booking
-      console.log('✅ Login successful, booking sockets will connect per booking');
+      console.log('✅ Google login successful in AuthContext');
       
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'ইমেইল/ফোন বা পাসওয়ার্ড ভুল';
+      const errorMessage = err instanceof Error ? err.message : 'লগইন ব্যর্থ';
       setError(errorMessage);
       throw err;
     } finally {
@@ -122,115 +103,43 @@ const checkAuth = async () => {
     }
   };
 
-const signup = async (name: string, email: string, password: string) => {
-  try {
-    setError(null);
-    setLoading(true);
-    // ✅ FIXED: Changed from '/user-auth/signup' to match your server routes
-    const response = await api.post('/user-auth/signup', { name, email, password });
-    localStorage.setItem('token', response.token);
-    localStorage.setItem('user', JSON.stringify(response.user));
-    setUser(response.user);
-  } catch (err) {
-    setError('অ্যাকাউন্ট তৈরি করতে সমস্যা হয়েছে');
-    throw err;
-  } finally {
-    setLoading(false);
-  }
-};
-
-  const signUpWithGoogle = async (): Promise<void> => {
+  const logout = async () => {
     try {
-      setError(null);
       setLoading(true);
-      const result = await signInWithPopup(auth, googleProvider);
+      const token = localStorage.getItem('token');
       
-      const response = await api.post('/user-auth/google-signup', {
-        email: result.user.email,
-        name: result.user.displayName,
-        photoURL: result.user.photoURL,
-        uid: result.user.uid
-      });
+      if (token) {
+        try {
+          await api.post('/user-auth/logout', {}, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        } catch (err) {
+          console.warn('Logout API call failed, continuing with local cleanup');
+        }
+      }
       
-      localStorage.setItem('token', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
-      setUser(response.user);
+      await auth.signOut();
+      
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('loginTime');
+      
+      // Disconnect all booking connections on logout
+      bookingSocketService.disconnectAll();
+      
+      setUser(null);
+      setCurrentUser(null);
+      
+      console.log('✅ Logout successful, all booking sockets disconnected');
+      
     } catch (err) {
-      setError('Google সাইন আপ ব্যর্থ হয়েছে');
+      console.error('Logout error:', err instanceof Error ? err.message : 'অজানা ত্রুটি');
+      setError(err instanceof Error ? err.message : 'লগআউট করতে সমস্যা হয়েছে');
       throw err;
     } finally {
       setLoading(false);
     }
   };
-
-  const signUpWithPhone = async (): Promise<void> => {
-    try {
-      setError(null);
-      setLoading(true);
-    } catch (err) {
-      setError('ফোন নম্বর দিয়ে সাইন আপ ব্যর্থ হয়েছে');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const setCustomPassword = async (email: string, password: string) => {
-    if (!email || !password) {
-      console.error('Error: ইমেইল ও পাসওয়ার্ড লাগবে');
-      return;
-    }
-  
-    try {
-      const response = await api.post('/user/set-password', { email, password });
-      console.log('Password set successfully:', response);
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        console.error('Error setting password:', error.message);
-      } else {
-        console.error('Error setting password:', error);
-      }
-    }
-  };
-
-const logout = async () => {
-  try {
-    setLoading(true);
-    const token = localStorage.getItem('token');
-    
-    if (token) {
-      try {
-        // ✅ FIXED: Changed from '/user/logout' to '/user-auth/logout'
-        await api.post('/user-auth/logout', {}, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      } catch (err) {
-        console.warn('Logout API call failed, continuing with local cleanup');
-      }
-    }
-    
-    await auth.signOut();
-    
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('loginTime');
-    
-    // ✅ DISCONNECT ALL BOOKING CONNECTIONS ON LOGOUT
-    bookingSocketService.disconnectAll();
-    
-    setUser(null);
-    setCurrentUser(null);
-    
-    console.log('✅ Logout successful, all booking sockets disconnected');
-    
-  } catch (err) {
-    console.error('Logout error:', err instanceof Error ? err.message : 'অজানা ত্রুটি');
-    setError(err instanceof Error ? err.message : 'লগআউট করতে সমস্যা হয়েছে');
-    throw err;
-  } finally {
-    setLoading(false);
-  }
-};
 
   const clearError = () => {
     setError(null);
@@ -241,13 +150,9 @@ const logout = async () => {
     currentUser,
     loading,
     error,
-    login,
-    signup,
     logout,
     clearError,
-    signUpWithGoogle,
-    signUpWithPhone,
-    setCustomPassword
+    loginWithGoogleToken
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

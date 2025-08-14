@@ -1,37 +1,33 @@
 import express from 'express';
 import { 
-  googleSignUp, 
-  setPassword, 
-  completeGoogleSignUp, 
-  validatePhoneNumber, 
-  completeSignup,
-  checkPhoneNumber, 
-  login,
+  googleSignUp,
   logout,
-  getAllUsers // নতুন কন্ট্রোলার ইমপোর্ট
+  getAllUsers,
+  getUserProfile // New function to be added
 } from '../controllers/userAuthController';
-import { authenticateAdmin } from '../middleware/authMiddleware'; // অ্যাডমিন অথেন্টিকেশন
+import { authenticateAdmin, authenticateToken } from '../middleware/authMiddleware';
 
 const router = express.Router();
 
-// 🔹 Login Routes
-router.post('/login', login);
+// 🔥 Google Authentication Routes
+router.post('/google-signup', googleSignUp); // Main Google auth endpoint
 
-// 🔹 Phone Registration Routes
-router.post('/register-phone', validatePhoneNumber);
+// 🔹 User Profile Routes
+router.get('/me', authenticateToken, getUserProfile);  // Get current user profile
 
-// 🔹 Google Signup Routes
-router.post('/google-signup', googleSignUp);
-router.post('/complete-google-signup', completeGoogleSignUp);
+// 🔹 Auth Management
+router.post('/logout', logout); // User logout
 
-// 🔹 Phone & Password Related Routes
-router.post('/set-password', setPassword);
-router.post('/validate-phone', validatePhoneNumber);
-router.post('/check-phone', checkPhoneNumber);
-router.post('/complete-signup', completeSignup);
-router.post('/logout', logout);
+// 🔹 Admin Only Routes
+router.get('/users', authenticateAdmin, getAllUsers); // Get all users (admin only)
 
-// 🔹 Admin Only Route for Getting All Users
-router.get('/get-users', authenticateAdmin, getAllUsers); // শুধুমাত্র অ্যাডমিন পাওয়া যাবে
+// ❌ REMOVED ROUTES (No longer needed for Google-only auth):
+// router.post('/login', login);
+// router.post('/register-phone', validatePhoneNumber);
+// router.post('/complete-google-signup', completeGoogleSignUp);
+// router.post('/set-password', setPassword);
+// router.post('/validate-phone', validatePhoneNumber);
+// router.post('/check-phone', checkPhoneNumber);
+// router.post('/complete-signup', completeSignup);
 
 export default router;
