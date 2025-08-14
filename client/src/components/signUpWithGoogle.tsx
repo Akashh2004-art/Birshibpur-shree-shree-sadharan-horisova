@@ -1,14 +1,16 @@
 import { FC, useEffect } from "react";
 import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from "firebase/auth";
-import { auth } from "../config/firebase";
+import { auth} from "../config/firebase";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 interface GoogleSignInButtonProps {
   onSuccess: (userData: any) => void;
   onError: (error: any) => void;
 }
 
-const SignUpWithGoogle: FC<GoogleSignInButtonProps> = ({ onSuccess, onError }) => {
+const signUpWithGoogle: FC<GoogleSignInButtonProps> = ({ onSuccess, onError }) => {
+  const navigate = useNavigate();
   
   // Handle redirect result when component mounts
   useEffect(() => {
@@ -21,7 +23,8 @@ const SignUpWithGoogle: FC<GoogleSignInButtonProps> = ({ onSuccess, onError }) =
         }
       } catch (error) {
         console.error("❌ Redirect sign-in error:", error);
-        onError("Google সাইন ইন redirect ব্যর্থ হয়েছে। আবার চেষ্টা করুন!");
+        const errorMessage = "Google সাইন ইন redirect ব্যর্থ হয়েছে। আবার চেষ্টা করুন!";
+        onError(errorMessage);
       }
     };
 
@@ -30,14 +33,14 @@ const SignUpWithGoogle: FC<GoogleSignInButtonProps> = ({ onSuccess, onError }) =
 
   const processGoogleSignIn = async (result: any) => {
     try {
-      const { email, displayName, photoURL } = result.user;
-      console.log("2️⃣ Google Sign In Success:", { email, name: displayName, photoURL });
+      const { email, displayName } = result.user;
+      console.log("2️⃣ Google Sign In Success:", { email, name: displayName });
 
       // Get the ID token
       const idToken = await result.user.getIdToken();
       console.log("3️⃣ 🔑 ID Token Received");
 
-      // Backend API URL for Google authentication
+      // Backend API URL - Fixed the correct route
       const apiUrl = "http://localhost:5000/api/user-auth/google-signup";
       console.log("4️⃣ Sending request to:", apiUrl);
       
@@ -53,29 +56,31 @@ const SignUpWithGoogle: FC<GoogleSignInButtonProps> = ({ onSuccess, onError }) =
       );
 
       console.log("5️⃣ 📩 Server Response:", response.data);
-      const { success, user, token } = response.data;
+      const { success, user, tempUser, token, needsPassword } = response.data;
 
-      if (success && user && token) {
-        console.log("✅ Google authentication successful!");
+      if (success) {
+        console.log("✅ Authentication successful, proceeding...");
         
-        // Pass user data and token to parent component
-        onSuccess({ 
-          user: {
-            id: user.id || user._id,
-            name: user.name,
-            email: user.email,
-            phone: user.phone || null,
-            isAdmin: user.isAdmin || false,
-            photoURL: user.photoURL || photoURL
-          }, 
-          token 
-        });
+        if (needsPassword) {
+          // Store temporary user data in sessionStorage
+          sessionStorage.setItem("tempUserData", JSON.stringify(tempUser || user));
+          
+          // Redirect to set password page
+          navigate('/set-password');
+        } else {
+          // User already exists and has a password
+          // Store token in localStorage for persistent login (1 year)
+          localStorage.setItem("token", token);
+          localStorage.setItem("user", JSON.stringify(user));
+          localStorage.setItem("loginTime", Date.now().toString());
+          onSuccess({ user, token });
+        }
       } else {
-        throw new Error(response.data.message || "Google authentication ব্যর্থ হয়েছে");
+        throw new Error(response.data.message || "Google সাইন আপ ব্যর্থ হয়েছে");
       }
     } catch (error: any) {
       console.error("❌ Google sign-in processing error:", error);
-      const errorMessage = error.response?.data?.message || error.message || "Google authentication ব্যর্থ হয়েছে। আবার চেষ্টা করুন!";
+      const errorMessage = error.response?.data?.message || "Google সাইন আপ ব্যর্থ হয়েছে। আবার চেষ্টা করুন!";
       onError(errorMessage);
     }
   };
@@ -121,7 +126,7 @@ const SignUpWithGoogle: FC<GoogleSignInButtonProps> = ({ onSuccess, onError }) =
 
     } catch (error: any) {
       console.error("❌ Google sign-in error:", error);
-      const errorMessage = error.response?.data?.message || error.message || "Google সাইন ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন!";
+      const errorMessage = error.response?.data?.message || "Google সাইন আপ ব্যর্থ হয়েছে। আবার চেষ্টা করুন!";
       onError(errorMessage);
     }
   };
@@ -130,7 +135,7 @@ const SignUpWithGoogle: FC<GoogleSignInButtonProps> = ({ onSuccess, onError }) =
     <button
       type="button"
       onClick={handleGoogleSignIn}
-      className="w-full flex items-center justify-center gap-3 bg-white text-gray-700 border border-gray-300 rounded-lg px-4 py-3 hover:bg-gray-50 hover:shadow-md transition-all duration-200 font-medium"
+      className="w-full flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors duration-200"
     >
       <svg
         className="w-5 h-5"
@@ -159,4 +164,4 @@ const SignUpWithGoogle: FC<GoogleSignInButtonProps> = ({ onSuccess, onError }) =
   );
 };
 
-export default SignUpWithGoogle;
+export default signUpWithGoogle;

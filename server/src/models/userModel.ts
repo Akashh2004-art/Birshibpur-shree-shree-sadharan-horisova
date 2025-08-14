@@ -4,13 +4,16 @@ export interface IUser extends Document {
   name?: string;
   email?: string;
   phone?: string;
-  password?: string; // Optional for Google users
+  password?: string;
   firebaseUID?: string;
   authProvider: 'email' | 'phone' | 'google';
   isVerified: boolean;
-  isAdmin: boolean; // Added for admin functionality
+  religion?: string; // Optional field, no default
+  otp?: string; // OTP সংরক্ষণের জন্য
+  otpExpires?: Date; // OTP মেয়াদ শেষ হওয়ার সময়
+  role?: 'admin' | 'user'; // Optional field, no default
+  status?: 'active' | 'inactive'; // Optional field, no default
   photoURL?: string; // For Google users
-  // Removed religion, role, status, otp, otpExpires - not needed for Google auth
 }
 
 const userSchema = new Schema<IUser>(
@@ -18,10 +21,6 @@ const userSchema = new Schema<IUser>(
     name: {
       type: String,
       trim: true,
-      required: function() {
-        // Name required for Google users, optional for others
-        return this.authProvider === 'google';
-      }
     },
     email: {
       type: String,
@@ -29,56 +28,40 @@ const userSchema = new Schema<IUser>(
       lowercase: true,
       unique: true,
       sparse: true,
-      required: function() {
-        // Email required for Google and email auth
-        return this.authProvider === 'google' || this.authProvider === 'email';
-      }
     },
     phone: {
       type: String,
       trim: true,
       unique: true,
       sparse: true,
-      // Optional for all auth types
     },
     password: {
       type: String,
-      required: function() {
-        // Password NOT required for Google users
-        return this.authProvider !== 'google';
-      }
+      required: true,
     },
     firebaseUID: {
       type: String,
       trim: true,
-      unique: true,
-      sparse: true, // Allows null values to be non-unique
-      required: function() {
-        // Firebase UID required only for Google auth
-        return this.authProvider === 'google';
-      }
     },
     authProvider: {
       type: String,
       enum: ['email', 'phone', 'google'],
       required: true,
-      default: 'email'
     },
     isVerified: {
       type: Boolean,
-      default: function() {
-        // Google users are auto-verified
-        return this.authProvider === 'google';
-      }
+      default: false, // This is okay to keep as default
     },
-    isAdmin: {
-      type: Boolean,
-      default: false
+    otp: {
+      type: String,
+    },
+    otpExpires: {
+      type: Date,
     },
     photoURL: {
       type: String,
       trim: true,
-    }
+    },
   },
   {
     timestamps: true,
@@ -90,10 +73,8 @@ userSchema.index({ email: 1 });
 userSchema.index({ phone: 1 });
 userSchema.index({ firebaseUID: 1 });
 userSchema.index({ authProvider: 1 });
-userSchema.index({ isAdmin: 1 });
-
-// Compound index for Google users
-userSchema.index({ firebaseUID: 1, authProvider: 1 });
+userSchema.index({ role: 1 });
+userSchema.index({ status: 1 });
 
 const User = mongoose.model<IUser>('User', userSchema);
 

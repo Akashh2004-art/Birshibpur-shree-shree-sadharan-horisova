@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react'; // useRef নেই, কারণ আমরা বাইরে ক্লিকের জন্য এটি ব্যবহার করছি না
 import MenuIcon from '@mui/icons-material/Menu';
 
 const Navbar = () => {
@@ -15,16 +15,20 @@ const Navbar = () => {
     { path: '/donations', label: 'Donations' },
   ];
 
+  // Close menu when clicking outside (Optional, keep if needed)
   useEffect(() => {
     const handleBodyScroll = () => {
       if (window.innerWidth <= 768) {
         document.body.style.overflow = isOpen ? 'hidden' : '';
       }
     };
-    handleBodyScroll();
-    window.addEventListener('resize', handleBodyScroll);
+  
+    handleBodyScroll(); // Apply the rule immediately
+  
+    window.addEventListener('resize', handleBodyScroll); // Recheck on resize
+  
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow = ''; // Cleanup
       window.removeEventListener('resize', handleBodyScroll);
     };
   }, [isOpen]);
@@ -33,11 +37,14 @@ const Navbar = () => {
     <nav className="bg-white shadow-lg sticky top-0 z-[60]">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
-          {/* Left side - Temple Name */}
+          {/* Left side - Temple Name with custom Bengali font */}
           <Link to="/" className="flex items-center">
             <span 
               className="text-xl md:text-2xl lg:text-3xl font-bold transition-all duration-300"
-              style={{ fontFamily: "'Noto Serif Bengali', serif", color: '#1a1a1a' }}
+              style={{ 
+                fontFamily: "'Noto Serif Bengali', serif",
+                color: '#1a1a1a'
+              }}
             >
               বীরশিবপুর শ্রী শ্রী সাধারণ হরিসভা
             </span>
@@ -74,6 +81,12 @@ const Navbar = () => {
                 >
                   Login
                 </Link>
+                <Link
+                  to="/signup"
+                  className="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-orange-500 hover:text-white transition-all duration-300"
+                >
+                  Sign Up
+                </Link>
               </div>
             )}
           </div>
@@ -90,7 +103,7 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Mobile menu */}
+      {/* Mobile menu with gradient background and smooth animation */}
       <div 
         className={`md:hidden fixed top-16 left-0 w-full bg-gradient-to-b from-orange-50 to-white backdrop-blur-sm shadow-lg z-50 transition-all duration-500 ease-out ${
           isOpen 
@@ -111,23 +124,34 @@ const Navbar = () => {
           ))}
           
           {user ? (
-            <button
-              onClick={() => {
-                logout();
-                setIsOpen(false);
-              }}
-              className="w-full text-center px-4 py-4 text-sm font-medium text-red-600 hover:bg-red-50 transition-all duration-200 last:border-b-0"
-            >
-              Logout
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  logout();
+                  setIsOpen(false);
+                }}
+                className="w-full text-center px-4 py-4 text-sm font-medium text-red-600 hover:bg-red-50 transition-all duration-200 last:border-b-0"
+              >
+                Logout
+              </button>
+            </>
           ) : (
-            <Link
-              to="/login"
-              onClick={() => setIsOpen(false)}
-              className="w-full text-center px-4 py-4 text-sm font-medium text-gray-700 hover:bg-orange-100 hover:text-orange-500 transition-all duration-200 last:border-b-0"
-            >
-              Login
-            </Link>
+            <>
+              <Link
+                to="/login"
+                onClick={() => setIsOpen(false)}
+                className="w-full text-center px-4 py-4 text-sm font-medium text-gray-700 hover:bg-orange-100 hover:text-orange-500 transition-all duration-200 border-b border-orange-100"
+              >
+                Login
+              </Link>
+              <Link
+                to="/signup"
+                onClick={() => setIsOpen(false)}
+                className="w-full text-center px-4 py-4 text-sm font-medium text-gray-700 hover:bg-orange-100 hover:text-orange-500 transition-all duration-200 last:border-b-0"
+              >
+                Sign Up
+              </Link>
+            </>
           )}
         </div>
       </div>

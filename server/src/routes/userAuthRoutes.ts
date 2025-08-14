@@ -1,33 +1,37 @@
 import express from 'express';
 import { 
-  googleSignUp,
+  googleSignUp, 
+  setPassword, 
+  completeGoogleSignUp, 
+  validatePhoneNumber, 
+  completeSignup,
+  checkPhoneNumber, 
+  login,
   logout,
-  getAllUsers,
-  getUserProfile // New function to be added
+  getAllUsers // নতুন কন্ট্রোলার ইমপোর্ট
 } from '../controllers/userAuthController';
-import { authenticateAdmin, authenticateToken } from '../middleware/authMiddleware';
+import { authenticateAdmin } from '../middleware/authMiddleware'; // অ্যাডমিন অথেন্টিকেশন
 
 const router = express.Router();
 
-// 🔥 Google Authentication Routes
-router.post('/google-signup', googleSignUp); // Main Google auth endpoint
+// 🔹 Login Routes
+router.post('/login', login);
 
-// 🔹 User Profile Routes
-router.get('/me', authenticateToken, getUserProfile);  // Get current user profile
+// 🔹 Phone Registration Routes
+router.post('/register-phone', validatePhoneNumber);
 
-// 🔹 Auth Management
-router.post('/logout', logout); // User logout
+// 🔹 Google Signup Routes
+router.post('/google-signup', googleSignUp);
+router.post('/complete-google-signup', completeGoogleSignUp);
 
-// 🔹 Admin Only Routes
-router.get('/users', authenticateAdmin, getAllUsers); // Get all users (admin only)
+// 🔹 Phone & Password Related Routes
+router.post('/set-password', setPassword);
+router.post('/validate-phone', validatePhoneNumber);
+router.post('/check-phone', checkPhoneNumber);
+router.post('/complete-signup', completeSignup);
+router.post('/logout', logout);
 
-// ❌ REMOVED ROUTES (No longer needed for Google-only auth):
-// router.post('/login', login);
-// router.post('/register-phone', validatePhoneNumber);
-// router.post('/complete-google-signup', completeGoogleSignUp);
-// router.post('/set-password', setPassword);
-// router.post('/validate-phone', validatePhoneNumber);
-// router.post('/check-phone', checkPhoneNumber);
-// router.post('/complete-signup', completeSignup);
+// 🔹 Admin Only Route for Getting All Users
+router.get('/get-users', authenticateAdmin, getAllUsers); // শুধুমাত্র অ্যাডমিন পাওয়া যাবে
 
 export default router;
