@@ -105,7 +105,7 @@ export const googleSignUp = async (
       const token = jwt.sign(
         { id: user._id },
         process.env.JWT_SECRET || "akashsaha0751",
-        { expiresIn: "365d" } // 1 বছরের জন্য টোকেন বৈধ থাকবে
+        { expiresIn: "60d" } // 1 বছরের জন্য টোকেন বৈধ থাকবে
       );
 
       res.status(200).json({
@@ -181,7 +181,7 @@ export const completeGoogleSignUp = async (
     const token = jwt.sign(
       { id: newUser._id },
       process.env.JWT_SECRET || "akashsaha0751",
-      { expiresIn: "365d" } // 1 বছরের জন্য টোকেন বৈধ থাকবে
+      { expiresIn: "60d" } // 1 বছরের জন্য টোকেন বৈধ থাকবে
     );
     
     res.status(201).json({
@@ -301,7 +301,7 @@ export const login = async (req: Request, res: Response) => {
     const token = jwt.sign(
       { id: user._id, identifier: user.email || user.phone, role: user.role },
       process.env.JWT_SECRET || "akashsaha0751",
-      { expiresIn: "365d" }
+      { expiresIn: "60d" }
     );
 
     res.json({
