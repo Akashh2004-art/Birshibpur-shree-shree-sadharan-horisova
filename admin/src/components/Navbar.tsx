@@ -18,6 +18,7 @@ const Navbar = () => {
     { path: "/events", label: "Events" },
     { path: "/gallery", label: "Gallery" },
     { path: "/users", label: "Users" },
+    { path: "/notes-calc", label: "NoteCalc" }, // ✅ updated path
   ];
 
   // Menu animation variants remain unchanged

@@ -22,6 +22,7 @@ import dashboardRoutes from "./routes/dashboardRoutes";
 import eventRoutes from "./routes/eventRoutes";
 import galleryRoutes from "./routes/galleryRoutes"; 
 import bookingRoutes from './routes/bookingRoutes';
+import noteRoutes from './routes/noteRoutes';
 
 dotenv.config();
 
@@ -122,16 +123,17 @@ const startServer = async () => {
     });
 
     // API Routes
-    app.use("/api/user-auth", userAuthRoutes);
-    app.use("/api/auth", authRoutes);
-    app.use("/api/admin", adminRoutes);
-    app.use("/api/password", passwordRoutes);
-    app.use("/api/user", userPasswordRoutes);
-    app.use("/api/notifications", notificationRoutes);
-    app.use("/api/dashboard", dashboardRoutes);
-    app.use("/api/events", eventRoutes);
-    app.use("/api/gallery", galleryRoutes);
-    app.use('/api/bookings', bookingRoutes);
+app.use("/api/auth", authRoutes);        // Admin auth routes (google-signup, login, profile)
+app.use("/api/user-auth", userAuthRoutes); // User auth routes (different path)
+app.use("/api/admin", adminRoutes);
+app.use("/api/password", passwordRoutes);
+app.use("/api/user", userPasswordRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/events", eventRoutes);
+app.use("/api/gallery", galleryRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/notes', noteRoutes);
 
     // 404 handler
     app.use((req: Request, res: Response) => {

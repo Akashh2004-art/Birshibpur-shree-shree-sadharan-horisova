@@ -12,6 +12,11 @@ import SetPasswordPage from "./pages/SetPasswordPage";
 import ForgotPassword from "./pages/ForgotPassword";
 import NotFound from "./components/NotFound";
 
+// ✅ Updated imports
+import NotesAndCalculations from './components/NotesAndCalculations';
+import NotePage from './pages/NotePage';
+import CalcPage from './pages/CalcPage';
+
 // Protected Route Component
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -156,6 +161,11 @@ function AppContent() {
               </PrivateRoute>
             }
           />
+
+          {/* ✅ Updated Routes */}
+          <Route path="/notes-calc" element={<NotesAndCalculations />} />
+          <Route path="/notes" element={<NotePage />} />  
+          <Route path="/calc" element={<CalcPage />} />
 
           {/* Global 404 Not Found */}
           <Route path="*" element={<NotFound />} />
