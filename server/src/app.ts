@@ -23,6 +23,7 @@ import eventRoutes from "./routes/eventRoutes";
 import galleryRoutes from "./routes/galleryRoutes"; 
 import bookingRoutes from './routes/bookingRoutes';
 import noteRoutes from './routes/noteRoutes';
+import calculationRoutes from './routes/calculationRoutes';
 
 dotenv.config();
 
@@ -46,7 +47,7 @@ createRequiredDirs();
 const app: Application = express();
 const server = createServer(app);
 
-// ✅ SINGLE SOCKET INITIALIZATION
+// ✅ Socket initialization for notifications only
 const io = initializeSocket(server);
 export { io };
 
@@ -123,17 +124,18 @@ const startServer = async () => {
     });
 
     // API Routes
-app.use("/api/auth", authRoutes);        // Admin auth routes (google-signup, login, profile)
-app.use("/api/user-auth", userAuthRoutes); // User auth routes (different path)
-app.use("/api/admin", adminRoutes);
-app.use("/api/password", passwordRoutes);
-app.use("/api/user", userPasswordRoutes);
-app.use("/api/notifications", notificationRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/events", eventRoutes);
-app.use("/api/gallery", galleryRoutes);
-app.use('/api/bookings', bookingRoutes);
-app.use('/api/notes', noteRoutes);
+    app.use("/api/auth", authRoutes);        // Admin auth routes (google-signup, login, profile)
+    app.use("/api/user-auth", userAuthRoutes); // User auth routes (different path)
+    app.use("/api/admin", adminRoutes);
+    app.use("/api/password", passwordRoutes);
+    app.use("/api/user", userPasswordRoutes);
+    app.use("/api/notifications", notificationRoutes);
+    app.use("/api/dashboard", dashboardRoutes);
+    app.use("/api/events", eventRoutes);
+    app.use("/api/gallery", galleryRoutes);
+    app.use('/api/bookings', bookingRoutes);
+    app.use('/api/notes', noteRoutes);
+    app.use('/api/calculations', calculationRoutes);
 
     // 404 handler
     app.use((req: Request, res: Response) => {
@@ -166,7 +168,7 @@ app.use('/api/notes', noteRoutes);
 📱 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}
 👑 Admin URL: ${process.env.ADMIN_URL || 'http://localhost:5100'}
 🔌 API Server: http://localhost:${PORT}
-🌐 Socket.io: Enabled
+🔔 Socket.io: Enabled (Notifications Only)
 ⏰ Started at: ${new Date().toLocaleString()}
 🌍 Environment: ${process.env.NODE_ENV || 'development'}
       `);

@@ -13,6 +13,8 @@ const NotePage = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
+  const [showReadOnly, setShowReadOnly] = useState(false);
+  const [viewingNote, setViewingNote] = useState<Note | null>(null);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [noteForm, setNoteForm] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -48,30 +50,43 @@ const NotePage = () => {
     } else if (state?.showList) {
       // Notes list দেখাতে হবে (form বন্ধ রাখি)
       setShowForm(false);
+      setShowReadOnly(false);
     } else {
       // Default behavior - list view
       setShowForm(false);
+      setShowReadOnly(false);
     }
   }, [location.state]);
 
   const handleNewNote = () => {
     setEditingNote(null);
+    setViewingNote(null);
     setNoteForm({
       date: new Date().toISOString().split('T')[0],
       title: '',
       content: ''
     });
     setShowForm(true);
+    setShowReadOnly(false);
   };
 
   const handleEditNote = (note: Note) => {
     setEditingNote(note);
+    setViewingNote(null);
     setNoteForm({
       date: note.date,
       title: note.title,
       content: note.content
     });
     setShowForm(true);
+    setShowReadOnly(false);
+  };
+
+  const handleViewNote = (note: Note) => {
+    setViewingNote(note);
+    setEditingNote(null);
+    setShowForm(false);
+    setShowReadOnly(true);
   };
 
   const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
@@ -111,7 +126,9 @@ const NotePage = () => {
       
       // Reset form and close
       setShowForm(false);
+      setShowReadOnly(false);
       setEditingNote(null);
+      setViewingNote(null);
       setNoteForm({ 
         date: new Date().toISOString().split('T')[0], 
         title: '', 
@@ -150,7 +167,9 @@ const NotePage = () => {
 
   const handleClose = () => {
     setShowForm(false);
+    setShowReadOnly(false);
     setEditingNote(null);
+    setViewingNote(null);
     setNoteForm({ 
       date: new Date().toISOString().split('T')[0], 
       title: '', 
@@ -161,6 +180,20 @@ const NotePage = () => {
 
   const handleBackToOverview = () => {
     navigate('/notes-calc');
+  };
+
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch {
+      return dateString;
+    }
   };
 
   // Error Display Component
@@ -178,6 +211,43 @@ const NotePage = () => {
       </div>
     </div>
   );
+
+  // Read-Only Note View
+  if (showReadOnly && viewingNote) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="container mx-auto px-6 max-w-4xl">
+          {/* Header */}
+          <div className="mb-8">
+            <button
+              onClick={handleClose}
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-4 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Back to Notes
+            </button>
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-3xl font-light text-gray-800 mb-2">{viewingNote.title}</h1>
+                <p className="text-gray-500">{formatDate(viewingNote.date)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Content Card */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="p-8">
+              <div className="prose max-w-none">
+                <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+                  {viewingNote.content}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Form View - Clean & Simple
   if (showForm) {
@@ -348,7 +418,7 @@ const NotePage = () => {
 
                 {/* Read More */}
                 <button
-                  onClick={() => handleEditNote(note)}
+                  onClick={() => handleViewNote(note)}
                   className="text-blue-600 text-sm hover:text-blue-700 font-medium"
                 >
                   Read more →

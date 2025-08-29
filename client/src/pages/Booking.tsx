@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-// 🔥 NEW IMPORT - Using our new booking socket service
-import bookingSocketService from '../config/socket';
+// ❌ REMOVED: import bookingSocketService from '../config/socket';
 import { getCurrentBookingStatus } from '../utils/api';
 
+// 📊 INTERFACES & DATA (UNCHANGED)
 export interface PujaService {
   id: number;
   name: string;
@@ -61,9 +62,12 @@ interface BookingStatus {
   message?: string;
 }
 
+// 🧠 PART 1: LOGIC, STATE & BUSINESS FUNCTIONS
 const Booking = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  
+  // 📋 CORE STATE (UNCHANGED)
   const [selectedService, setSelectedService] = useState<PujaService | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showStatusSection, setShowStatusSection] = useState(false);
@@ -81,15 +85,16 @@ const Booking = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingStatus, setIsLoadingStatus] = useState(false);
   
-  // 🔥 NEW STATE - Booking-specific socket connection status
-  const [bookingSocketConnected, setBookingSocketConnected] = useState(false);
-  const [connectionMessage, setConnectionMessage] = useState('');
-  const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
+  // ❌ REMOVED: All socket-related state
+  // - bookingSocketConnected
+  // - connectionMessage 
+  // - activeBookingId
   
-  // Timers
+  // ⏰ TIMER STATE (UNCHANGED)
   const statusUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
 
+  // 🔧 UTILITY FUNCTIONS (UNCHANGED)
   const getMinDate = () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -111,95 +116,15 @@ const Booking = () => {
   const calculateBookingEndTime = (dateStr: string, timeStr: string): Date => {
     const selectedDate = new Date(dateStr);
     const { hour, minute } = parseTimeString(timeStr);
-    // Set booking end time (puja time + 5 minutes buffer)
     selectedDate.setHours(hour, minute + 5, 0, 0);
     return selectedDate;
   };
 
-  // 🔥 NEW FUNCTION - Start booking-specific socket connection
-  const startBookingSocket = async (bookingId: string, bookingEndTime: Date) => {
-    if (!user) return;
+  // ❌ REMOVED: All socket functions
+  // - startBookingSocket()
+  // - stopBookingSocket()
 
-    const userId = user.id || user._id;
-    if (!userId) return;
-
-    try {
-      setConnectionMessage('বুকিং সংযোগ স্থাপন করা হচ্ছে...');
-      
-      // Connect socket specifically for this booking
-      const socket = await bookingSocketService.connectForBooking(
-        bookingId,
-        userId,
-        bookingEndTime
-      );
-
-      setBookingSocketConnected(true);
-      setActiveBookingId(bookingId);
-      setConnectionMessage('বুকিং সংযোগ সক্রিয়');
-
-      // 🎯 Listen for booking-specific events
-      bookingSocketService.onBookingEvent(bookingId, 'booking_status_update', (data: any) => {
-        console.log(`📋 Booking ${bookingId} status update:`, data);
-        
-        if (data.status === 'approved') {
-          setBookingStatus(prev => prev ? { ...prev, status: 'approved', message: data.message } : null);
-          setConnectionMessage('বুকিং অনুমোদিত! সংযোগ সক্রিয়');
-          // Keep socket connected for real-time updates
-        } else if (data.status === 'rejected') {
-          setBookingStatus(prev => prev ? { 
-            ...prev, 
-            status: 'rejected', 
-            rejectionReason: data.rejectionReason 
-          } : null);
-          
-          // 🔥 DISCONNECT IMMEDIATELY ON REJECTION
-          setConnectionMessage('বুকিং বাতিল - সংযোগ বন্ধ');
-          bookingSocketService.disconnectBooking(bookingId);
-          setBookingSocketConnected(false);
-          setActiveBookingId(null);
-          
-          if (statusUpdateTimeoutRef.current) {
-            clearTimeout(statusUpdateTimeoutRef.current);
-          }
-          setTimeRemaining('');
-        }
-      });
-
-      bookingSocketService.onBookingEvent(bookingId, 'booking_accepted', (data: any) => {
-        console.log(`✅ Booking ${bookingId} accepted:`, data);
-        setConnectionMessage('বুকিং গৃহীত! রিয়েল-টাইম আপডেট চালু');
-      });
-
-      bookingSocketService.onBookingEvent(bookingId, 'booking_completed', (data: any) => {
-        console.log(`🎉 Booking ${bookingId} completed:`, data);
-        setConnectionMessage('পূজা সম্পন্ন - সংযোগ বন্ধ');
-        setBookingSocketConnected(false);
-        setActiveBookingId(null);
-      });
-
-      return socket;
-
-    } catch (error: any) {
-      console.error(`🚫 Failed to start booking socket for ${bookingId}:`, error);
-      setConnectionMessage(`সংযোগ ত্রুটি: ${error.message}`);
-      setBookingSocketConnected(false);
-      setActiveBookingId(null);
-      throw error;
-    }
-  };
-
-  // 🔥 NEW FUNCTION - Stop booking socket connection
-  const stopBookingSocket = (bookingId?: string) => {
-    const idToStop = bookingId || activeBookingId;
-    if (idToStop) {
-      bookingSocketService.disconnectBooking(idToStop);
-      setBookingSocketConnected(false);
-      setActiveBookingId(null);
-      setConnectionMessage('সংযোগ বন্ধ');
-    }
-  };
-
-  // 🔥 MODIFIED SUBMIT FUNCTION - With socket integration
+  // 📡 SIMPLIFIED SUBMIT FUNCTION (socket removed)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -211,6 +136,7 @@ const Booking = () => {
       return;
     }
 
+    // Date validation
     const selectedDate = new Date(formData.date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -226,7 +152,7 @@ const Booking = () => {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const token = localStorage.getItem('token');
       
-      // 📡 Step 1: Submit booking to API
+      // Submit booking via API
       const response = await fetch(`${apiUrl}/bookings/create`, {
         method: 'POST',
         headers: {
@@ -240,18 +166,10 @@ const Booking = () => {
 
       if (data.success) {
         const bookingId = data.data.bookingId;
-        const bookingEndTime = calculateBookingEndTime(formData.date, formData.time);
         
-        // 🔌 Step 2: Start booking-specific socket connection
-        try {
-          await startBookingSocket(bookingId, bookingEndTime);
-          console.log(`✅ Booking socket started for: ${bookingId}`);
-        } catch (socketError) {
-          console.warn('⚠️ Socket connection failed, but booking was created:', socketError);
-          // Continue with booking even if socket fails
-        }
-
-        // 📋 Step 3: Update UI state
+        // ❌ REMOVED: Socket connection logic
+        
+        // Update UI state
         setShowForm(false);
         setShowStatusSection(true);
         setBookingStatus({
@@ -262,7 +180,7 @@ const Booking = () => {
           status: 'pending',
         });
 
-        // 🧹 Step 4: Reset form
+        // Reset form
         setSelectedService(null);
         setFormData({
           name: user?.name || '',
@@ -274,20 +192,20 @@ const Booking = () => {
           message: '',
         });
 
-        console.log(`🎯 Booking submitted successfully: ${bookingId}`);
+        console.log(`✅ Booking submitted successfully: ${bookingId}`);
 
       } else {
         setError(data.message || 'বুকিং করতে সমস্যা হয়েছে। পরে আবার চেষ্টা করুন।');
       }
     } catch (err: any) {
-      console.error('🚫 Booking submission failed:', err);
+      console.error('❌ Booking submission failed:', err);
       setError(err.message || 'বুকিং করতে সমস্যা হয়েছে। পরে আবার চেষ্টা করুন।');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // 🔥 MODIFIED - Check existing booking status (without auto socket connection)
+  // 📊 STATUS CHECK FUNCTION (socket removed)
   const checkCurrentBookingStatus = async () => {
     if (!user) return;
     setIsLoadingStatus(true);
@@ -309,20 +227,10 @@ const Booking = () => {
         setShowStatusSection(true);
         setShowForm(false);
         
-        // 🔌 Auto-connect socket only for approved bookings
+        // ❌ REMOVED: Socket auto-connection
+        // Only set timeout for approved bookings
         if (response.data.status === 'approved') {
-          const bookingEndTime = calculateBookingEndTime(response.data.date, response.data.time);
-          const now = new Date();
-          
-          // Only connect if booking hasn't expired
-          if (bookingEndTime > now) {
-            try {
-              await startBookingSocket(response.data.bookingId, bookingEndTime);
-              setStatusExpiryTimeout(response.data.date, response.data.time);
-            } catch (error) {
-              console.warn('⚠️ Failed to auto-connect to existing booking socket:', error);
-            }
-          }
+          setStatusExpiryTimeout(response.data.date, response.data.time);
         }
       } else {
         setShowStatusSection(false);
@@ -337,6 +245,7 @@ const Booking = () => {
     }
   };
 
+  // ⏰ TIMEOUT & COUNTDOWN (socket cleanup removed)
   const setStatusExpiryTimeout = (dateStr: string, timeStr: string) => {
     const expiryTime = calculateBookingEndTime(dateStr, timeStr);
     const now = new Date();
@@ -351,10 +260,7 @@ const Booking = () => {
         setShowForm(false);
         setBookingStatus(null);
         setTimeRemaining('');
-        // Auto disconnect socket when time expires
-        if (activeBookingId) {
-          stopBookingSocket(activeBookingId);
-        }
+        // ❌ REMOVED: Socket disconnection
       }, timeUntilExpiry);
       startCountdown(expiryTime);
     } else {
@@ -380,27 +286,7 @@ const Booking = () => {
     updateCountdown();
   };
 
-  // 🔥 CLEANUP EFFECT - Disconnect sockets on unmount
-  useEffect(() => {
-    return () => {
-      // Cleanup all socket connections on component unmount
-      if (activeBookingId) {
-        stopBookingSocket(activeBookingId);
-      }
-      if (statusUpdateTimeoutRef.current) {
-        clearTimeout(statusUpdateTimeoutRef.current);
-      }
-    };
-  }, [activeBookingId]);
-
-  // Check booking status on user load
-  useEffect(() => {
-    if (user && !loading) {
-      checkCurrentBookingStatus();
-    }
-  }, [user, loading]);
-
-  // Other utility functions remain the same...
+  // 🎯 EVENT HANDLERS (socket code removed)
   const handleServiceSelect = (service: PujaService) => {
     if (!user && !loading) {
       sessionStorage.setItem('selectedServiceId', service.id.toString());
@@ -435,11 +321,7 @@ const Booking = () => {
   };
 
   const handleNewBooking = () => {
-    // Disconnect current booking socket before starting new booking
-    if (activeBookingId) {
-      stopBookingSocket(activeBookingId);
-    }
-    
+    // ❌ REMOVED: Socket disconnection
     setShowStatusSection(false);
     setBookingStatus(null);
     setError('');
@@ -454,15 +336,17 @@ const Booking = () => {
     return date.toLocaleDateString('bn-BD');
   };
 
-  // 🎯 Continue with Part 2 for UI rendering...
-  
-  // PART 1 ENDS HERE - Contains all socket logic and booking submission
-  // Part 2 will contain the UI rendering components
+  // 🔄 USEEFFECTS (socket cleanup removed)
+  // ❌ REMOVED: Socket cleanup useEffect
 
-  // 🎨 PART 2: UI COMPONENTS & RENDERING
-  // Continue from Part 1...
+  // Check booking status on load
+  useEffect(() => {
+    if (user && !loading) {
+      checkCurrentBookingStatus();
+    }
+  }, [user, loading]);
 
-  // Auto-fill form data and handle service selection from session
+  // Auto-fill form data
   useEffect(() => {
     window.scrollTo(0, 0);
     if (user && showForm) {
@@ -491,7 +375,7 @@ const Booking = () => {
     }
   }, [user]);
 
-  // 🔄 Loading states
+// 🔄 Loading states
   if (loading || isLoadingStatus) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -505,7 +389,7 @@ const Booking = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* 🎨 ENHANCED HERO SECTION */}
+      {/* 🎨 SIMPLIFIED HERO SECTION (socket status removed) */}
       <div className="bg-orange-500 text-white py-16">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-4xl font-bold mb-4">পূজা বুকিং</h1>
@@ -521,74 +405,25 @@ const Booking = () => {
             <p className="mt-4 text-orange-100">পূজা বুকিং করতে প্রথমে সাইন আপ করুন</p>
           )}
           
-          {/* 🔥 NEW: BOOKING-SPECIFIC CONNECTION STATUS */}
-          {user && (
-            <div className="mt-4 space-y-2">
-              <div className="flex justify-center items-center space-x-4">
-                {/* Booking Socket Status */}
-                {activeBookingId && (
-                  <span
-                    className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                      bookingSocketConnected 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}
-                  >
-                    <span
-                      className={`w-2 h-2 rounded-full mr-2 ${
-                        bookingSocketConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
-                      }`}
-                    ></span>
-                    {bookingSocketConnected ? '🔗 বুকিং সংযুক্ত' : '❌ বুকিং বিচ্ছিন্ন'}
-                  </span>
-                )}
-
-                {/* Booking Status */}
-                {bookingStatus && (
-                  <span
-                    className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                      bookingStatus.status === 'pending'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : bookingStatus.status === 'approved'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}
-                  >
-                    {bookingStatus.status === 'pending' && '⏳ অপেক্ষমান'}
-                    {bookingStatus.status === 'approved' && '✅ অনুমোদিত'}
-                    {bookingStatus.status === 'rejected' && '❌ বাতিল'}
-                    {bookingStatus.status === 'approved' && timeRemaining && ` (${timeRemaining})`}
-                  </span>
-                )}
-              </div>
-              
-              {/* Connection Message */}
-              {connectionMessage && (
-                <div className="text-center">
-                  <p className="text-orange-100 text-sm">{connectionMessage}</p>
-                  {/* Active Booking ID Display */}
-                  {activeBookingId && (
-                    <p className="text-orange-200 text-xs mt-1">
-                      সক্রিয় বুকিং: {activeBookingId}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Connection Stats for Debugging (remove in production) */}
-              {process.env.NODE_ENV === 'development' && activeBookingId && (
-                <div className="text-center mt-2">
-                  <button
-                    onClick={() => {
-                      const info = bookingSocketService.getActiveConnectionsInfo();
-                      console.log('🔍 Active Connections:', info);
-                    }}
-                    className="text-orange-200 text-xs hover:text-white"
-                  >
-                    Debug: Active Connections ({bookingSocketService.getActiveConnectionsInfo().totalActive})
-                  </button>
-                </div>
-              )}
+          {/* ❌ REMOVED: Socket connection status display */}
+          
+          {/* 📋 BOOKING STATUS BADGE ONLY */}
+          {user && bookingStatus && (
+            <div className="mt-4">
+              <span
+                className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+                  bookingStatus.status === 'pending'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : bookingStatus.status === 'approved'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-red-100 text-red-800'
+                }`}
+              >
+                {bookingStatus.status === 'pending' && 'অপেক্ষমান'}
+                {bookingStatus.status === 'approved' && 'অনুমোদিত'}
+                {bookingStatus.status === 'rejected' && 'বাতিল'}
+                {bookingStatus.status === 'approved' && timeRemaining && ` (${timeRemaining})`}
+              </span>
             </div>
           )}
         </div>
@@ -603,7 +438,7 @@ const Booking = () => {
             </div>
           )}
 
-          {/* 📋 ENHANCED STATUS SECTION */}
+          {/* 📋 SIMPLIFIED STATUS SECTION (socket indicators removed) */}
           {showStatusSection && bookingStatus && (
             <div className="bg-white rounded-lg p-6 mb-8 border shadow-lg">
               <div className="text-center">
@@ -616,9 +451,9 @@ const Booking = () => {
                       : 'text-red-600'
                   }`}
                 >
-                  {bookingStatus.status === 'pending' && '⏳ বুকিং প্রক্রিয়াধীন'}
-                  {bookingStatus.status === 'approved' && '✅ বুকিং অনুমোদিত!'}
-                  {bookingStatus.status === 'rejected' && '❌ বুকিং বাতিল'}
+                  {bookingStatus.status === 'pending' && 'বুকিং প্রক্রিয়াধীন'}
+                  {bookingStatus.status === 'approved' && 'বুকিং অনুমোদিত!'}
+                  {bookingStatus.status === 'rejected' && 'বুকিং বাতিল'}
                 </h3>
 
                 {/* Booking Details Grid */}
@@ -641,30 +476,13 @@ const Booking = () => {
                   </div>
                 </div>
 
-                {/* 🔥 REAL-TIME CONNECTION STATUS */}
-                {bookingStatus.status !== 'rejected' && (
-                  <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                    <div className="flex items-center justify-center space-x-2">
-                      {bookingSocketConnected ? (
-                        <div className="flex items-center text-green-600">
-                          <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse mr-2"></div>
-                          <span className="text-sm font-medium">রিয়েল-টাইম সংযোগ সক্রিয়</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center text-orange-600">
-                          <div className="w-3 h-3 bg-orange-500 rounded-full mr-2"></div>
-                          <span className="text-sm font-medium">সংযোগ বিচ্ছিন্ন</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                {/* ❌ REMOVED: Real-time connection status display */}
 
-                {/* Status-specific Messages */}
+                {/* Status Messages */}
                 {bookingStatus.status === 'approved' && timeRemaining && (
                   <div className="bg-blue-100 p-4 rounded-lg mb-4">
                     <p className="text-blue-600 font-medium">
-                      ⏰ স্ট্যাটাস পেজ স্বয়ংক্রিয়ভাবে বন্ধ হবে: {timeRemaining}
+                      স্ট্যাটাস পেজ স্বয়ংক্রিয়ভাবে বন্ধ হবে: {timeRemaining}
                     </p>
                   </div>
                 )}
@@ -672,30 +490,25 @@ const Booking = () => {
                 {bookingStatus.status === 'pending' && (
                   <div className="bg-yellow-100 p-4 rounded-lg mb-4">
                     <p className="text-yellow-700">
-                      🔄 অ্যাডমিনের অনুমোদনের জন্য অপেক্ষা করুন।
-                      {bookingSocketConnected && (
-                        <span className="block text-sm mt-1">
-                          ✨ রিয়েল-টাইম আপডেট চালু আছে
-                        </span>
-                      )}
+                      অ্যাডমিনের অনুমোদনের জন্য অপেক্ষা করুন।
+                      {/* ❌ REMOVED: Real-time update message */}
+                      <span className="block text-sm mt-1">
+                        ইমেইলের মাধ্যমে আপডেট পাবেন।
+                      </span>
                     </p>
                   </div>
                 )}
 
                 {bookingStatus.status === 'approved' && (
                   <div className="text-left bg-green-100 p-4 rounded-lg mb-4">
-                    <h4 className="font-bold text-green-800 mb-2">📋 নির্দেশনা:</h4>
+                    <h4 className="font-bold text-green-800 mb-2">নির্দেশনা:</h4>
                     <ul className="text-green-700 space-y-1 text-sm">
                       <li>• নির্ধারিত সময়ে মন্দিরে উপস্থিত হন</li>
                       <li>• পূজার ১৫ মিনিট আগে পৌঁছান</li>
                       <li>• প্রয়োজনীয় উপকরণ সাথে রাখুন</li>
                       <li>• বুকিং আইডি সাথে রাখুন</li>
                     </ul>
-                    {bookingSocketConnected && (
-                      <p className="text-green-600 text-xs mt-2">
-                        🔗 পূজা সম্পন্ন না হওয়া পর্যন্ত রিয়েল-টাইম আপডেট পেতে থাকবেন
-                      </p>
-                    )}
+                    {/* ❌ REMOVED: Real-time update message */}
                   </div>
                 )}
 
@@ -704,7 +517,7 @@ const Booking = () => {
                     {bookingStatus.rejectionReason && (
                       <div className="bg-red-100 p-4 rounded-lg">
                         <p className="text-red-600">
-                          <strong>❌ বাতিলের কারণ:</strong>
+                          <strong>বাতিলের কারণ:</strong>
                           <br />
                           {bookingStatus.rejectionReason}
                         </p>
@@ -714,7 +527,20 @@ const Booking = () => {
                       onClick={handleNewBooking}
                       className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors"
                     >
-                      🔄 নতুন বুকিং করুন
+                      নতুন বুকিং করুন
+                    </button>
+                  </div>
+                )}
+
+                {/* Manual Refresh Button - since no real-time updates */}
+                {bookingStatus.status === 'pending' && (
+                  <div className="mt-4">
+                    <button
+                      onClick={checkCurrentBookingStatus}
+                      disabled={isLoadingStatus}
+                      className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+                    >
+                      {isLoadingStatus ? 'চেক করা হচ্ছে...' : 'স্ট্যাটাস রিফ্রেশ করুন'}
                     </button>
                   </div>
                 )}
@@ -722,7 +548,7 @@ const Booking = () => {
             </div>
           )}
 
-          {/* 🎯 SERVICES SELECTION */}
+          {/* 🎯 SERVICES SELECTION (UNCHANGED) */}
           {!showStatusSection && !showForm && (
             <div>
               <h2 className="text-3xl font-bold text-center text-gray-800 mb-8">পূজা সেবাসমূহ</h2>
@@ -737,17 +563,17 @@ const Booking = () => {
                     <p className="text-gray-600 mb-4">{service.description}</p>
                     <div className="space-y-2">
                       <p className="text-sm">
-                        <strong>⏱️ সময়কাল:</strong> {service.duration}
+                        <strong>সময়কাল:</strong> {service.duration}
                       </p>
                       <p className="text-sm">
-                        <strong>🎯 উপকরণ:</strong> {service.items.join(', ')}
+                        <strong>উপকরণ:</strong> {service.items.join(', ')}
                       </p>
                       <p className="text-sm">
-                        <strong>🕐 সময়সূচী:</strong> {service.time.join(', ')}
+                        <strong>সময়সূচী:</strong> {service.time.join(', ')}
                       </p>
                     </div>
                     <button className="mt-4 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 w-full transition-colors">
-                      {user ? '📝 বুকিং করুন' : '📝 সাইন আপ করে বুকিং করুন'}
+                      {user ? 'বুকিং করুন' : 'সাইন আপ করে বুকিং করুন'}
                     </button>
                   </div>
                 ))}
@@ -755,12 +581,12 @@ const Booking = () => {
             </div>
           )}
 
-          {/* 📝 BOOKING FORM */}
+          {/* 📝 BOOKING FORM (UNCHANGED) */}
           {!showStatusSection && showForm && selectedService && (
             <div className="bg-white rounded-lg p-6 border max-w-2xl mx-auto shadow-lg">
               <div className="mb-6">
                 <h3 className="text-xl font-bold text-gray-800 mb-2">
-                  📋 {selectedService.name}
+                  {selectedService.name}
                 </h3>
                 <p className="text-gray-600 mb-4">{selectedService.description}</p>
                 <button
@@ -776,7 +602,7 @@ const Booking = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-gray-700 font-medium mb-2" htmlFor="name">
-                      👤 নাম *
+                      নাম *
                     </label>
                     <input
                       type="text"
@@ -790,7 +616,7 @@ const Booking = () => {
                   </div>
                   <div>
                     <label className="block text-gray-700 font-medium mb-2" htmlFor="phone">
-                      📞 ফোন নম্বর *
+                      ফোন নম্বর *
                     </label>
                     <input
                       type="tel"
@@ -805,7 +631,7 @@ const Booking = () => {
 
                 <div>
                   <label className="block text-gray-700 font-medium mb-2" htmlFor="email">
-                    📧 ইমেইল *
+                    ইমেইল *
                   </label>
                   <input
                     type="email"
@@ -822,7 +648,7 @@ const Booking = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-gray-700 font-medium mb-2" htmlFor="date">
-                      📅 তারিখ * (আগামীকাল থেকে)
+                      তারিখ * (আগামীকাল থেকে)
                     </label>
                     <input
                       type="date"
@@ -836,7 +662,7 @@ const Booking = () => {
                   </div>
                   <div>
                     <label className="block text-gray-700 font-medium mb-2" htmlFor="time">
-                      🕐 সময় *
+                      সময় *
                     </label>
                     <select
                       id="time"
@@ -857,7 +683,7 @@ const Booking = () => {
 
                 <div>
                   <label className="block text-gray-700 font-medium mb-2" htmlFor="message">
-                    💬 বিশেষ নির্দেশনা (যদি থাকে)
+                    বিশেষ নির্দেশনা (যদি থাকে)
                   </label>
                   <textarea
                     id="message"
@@ -887,19 +713,20 @@ const Booking = () => {
                     {isSubmitting ? (
                       <>
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                        🔄 বুকিং করা হচ্ছে...
+                        বুকিং করা হচ্ছে...
                       </>
                     ) : (
-                      '✅ বুকিং নিশ্চিত করুন'
+                      'বুকিং নিশ্চিত করুন'
                     )}
                   </button>
                 </div>
 
-                {/* Form Info */}
+                {/* ❌ REMOVED: Socket-related form info */}
+                {/* 📧 MODIFIED: Email notification info */}
                 <div className="bg-blue-50 p-4 rounded-lg mt-4">
                   <p className="text-blue-700 text-sm">
-                    ℹ️ <strong>তথ্য:</strong> বুকিং সাবমিট করার পর আপনি স্বয়ংক্রিয়ভাবে রিয়েল-টাইম আপডেট পেতে শুরু করবেন।
-                    অ্যাডমিন আপনার বুকিং গ্রহণ বা বাতিল করার সাথে সাথেই আপনি জানতে পারবেন।
+                    <strong>তথ্য:</strong> বুকিং সাবমিট করার পর আপনার ইমেইলে নিশ্চিতকরণ পাঠানো হবে।
+                    অ্যাডমিন আপনার বুকিং গ্রহণ বা বাতিল করলে ইমেইল পাবেন।
                   </p>
                 </div>
               </form>
@@ -912,3 +739,51 @@ const Booking = () => {
 };
 
 export default Booking;
+
+/*
+================================
+🧹 SOCKET REMOVAL SUMMARY:
+================================
+
+REMOVED ITEMS:
+❌ Socket import statement
+❌ Socket state variables (bookingSocketConnected, connectionMessage, activeBookingId)
+❌ startBookingSocket() function
+❌ stopBookingSocket() function  
+❌ Socket event listeners (booking_status_update, booking_accepted, booking_completed)
+❌ Real-time update handlers
+❌ Socket cleanup useEffect
+❌ Socket connection status indicators in UI
+❌ Real-time connection info displays
+❌ Debug connection information
+
+MODIFIED ITEMS:
+✅ handleSubmit() - Removed socket connection logic
+✅ checkCurrentBookingStatus() - Removed socket auto-connection
+✅ handleNewBooking() - Removed socket disconnection
+✅ setStatusExpiryTimeout() - Removed socket cleanup
+✅ Hero section - Removed socket status displays
+✅ Status section - Removed connection indicators
+✅ Form info - Changed from real-time to email notifications
+
+KEPT ITEMS:
+✅ All API calls
+✅ Email notification system (server-side)
+✅ Form validation & handling
+✅ Booking status checking
+✅ Timeout & countdown functionality
+✅ All UI components & styling
+✅ Authentication flow
+
+NEXT STEPS FOR CLIENT SIDE:
+1. ✅ Delete /src/config/socket.ts (already done)
+2. ✅ Update Booking.tsx (completed above)
+3. 📦 Update package.json - remove socket.io-client dependency
+
+IMPACT:
+- 📉 No more real-time booking updates
+- 📧 Email notifications still work
+- 🔄 Manual refresh needed for status updates
+- 🎯 Simpler, more stable codebase
+- ⚡ Better performance
+*/

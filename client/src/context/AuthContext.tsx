@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api, userLogin } from '../utils/api';
 import { auth, googleProvider } from '../config/firebase';
 import { signInWithPopup, User as FirebaseUser } from 'firebase/auth';
-import bookingSocketService from '../config/socket';
 
 interface User {
   id: string;
@@ -40,9 +39,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ REMOVED SOCKET CONNECTION MANAGEMENT FROM AUTH CONTEXT
-  // Socket connections are now handled per booking in Booking.tsx
-  // No global socket connection needed in AuthContext anymore
+  // ✅ REMOVED ALL SOCKET IMPORTS AND REFERENCES
+  // Socket connections will be handled individually per component as needed
 
   useEffect(() => {
     checkAuth();
@@ -51,11 +49,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setCurrentUser(firebaseUser);
     });
 
-    // ✅ CLEANUP ON UNMOUNT - Only disconnect all booking connections
     return () => {
       unsubscribe();
-      // Only disconnect all bookings when app is closing
-      bookingSocketService.disconnectAll();
     };
   }, []);
 
@@ -73,7 +68,6 @@ const checkAuth = async () => {
       setUser(JSON.parse(storedUser));
       setLoading(false);
     } else {
-      // ✅ FIXED: Changed from '/user-auth/me' to match your server routes
       const response = await api.get('/user-auth/me');
       setUser(response.user);
       localStorage.setItem('user', JSON.stringify(response.user));
@@ -82,8 +76,6 @@ const checkAuth = async () => {
     console.error('Auth check error:', err);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    // Only disconnect booking connections on auth failure
-    bookingSocketService.disconnectAll();
   } finally {
     setLoading(false);
   }
@@ -110,8 +102,7 @@ const checkAuth = async () => {
       
       setUser(response.user);
       
-      // ✅ NO GLOBAL SOCKET CONNECTION - Booking sockets connect per booking
-      console.log('✅ Login successful, booking sockets will connect per booking');
+      console.log('✅ Login successful');
       
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'ইমেইল/ফোন বা পাসওয়ার্ড ভুল';
@@ -126,7 +117,6 @@ const signup = async (name: string, email: string, password: string) => {
   try {
     setError(null);
     setLoading(true);
-    // ✅ FIXED: Changed from '/user-auth/signup' to match your server routes
     const response = await api.post('/user-auth/signup', { name, email, password });
     localStorage.setItem('token', response.token);
     localStorage.setItem('user', JSON.stringify(response.user));
@@ -200,7 +190,6 @@ const logout = async () => {
     
     if (token) {
       try {
-        // ✅ FIXED: Changed from '/user/logout' to '/user-auth/logout'
         await api.post('/user-auth/logout', {}, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -215,13 +204,10 @@ const logout = async () => {
     localStorage.removeItem('user');
     localStorage.removeItem('loginTime');
     
-    // ✅ DISCONNECT ALL BOOKING CONNECTIONS ON LOGOUT
-    bookingSocketService.disconnectAll();
-    
     setUser(null);
     setCurrentUser(null);
     
-    console.log('✅ Logout successful, all booking sockets disconnected');
+    console.log('✅ Logout successful');
     
   } catch (err) {
     console.error('Logout error:', err instanceof Error ? err.message : 'অজানা ত্রুটি');

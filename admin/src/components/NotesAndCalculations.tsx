@@ -3,18 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { Loader } from 'lucide-react';
 import { noteAPI, Note } from '../api/note';
-
-// Sample calculations data - এটা পরে backend দিয়ে replace হবে
-const sampleCalculations = [
-  { id: '1', date: '2025-08-27', title: 'Monthly Budget', total: 15000 },
-  { id: '2', date: '2025-08-26', title: 'Project Cost', total: 8500 },
-  { id: '3', date: '2025-08-25', title: 'Travel Expenses', total: 3200 },
-  { id: '4', date: '2025-08-24', title: 'Utility Bills', total: 2800 },
-  { id: '5', date: '2025-08-23', title: 'Office Supplies', total: 1500 },
-  { id: '6', date: '2025-08-22', title: 'Marketing Budget', total: 12000 },
-  { id: '7', date: '2025-08-21', title: 'Equipment Purchase', total: 25000 },
-  { id: '8', date: '2025-08-20', title: 'Training Costs', total: 4500 },
-];
+import { calculationAPI, Calculation } from '../api/calculation';
 
 const NotesAndCalculations = () => {
   const navigate = useNavigate();
@@ -23,6 +12,11 @@ const NotesAndCalculations = () => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [notesLoading, setNotesLoading] = useState(true);
   const [notesError, setNotesError] = useState<string | null>(null);
+
+  // State for calculations (real data from MongoDB)
+  const [calculations, setCalculations] = useState<Calculation[]>([]);
+  const [calculationsLoading, setCalculationsLoading] = useState(true);
+  const [calculationsError, setCalculationsError] = useState<string | null>(null);
 
   // Load recent notes from MongoDB
   const loadRecentNotes = async () => {
@@ -39,9 +33,25 @@ const NotesAndCalculations = () => {
     }
   };
 
+  // Load recent calculations from MongoDB
+  const loadRecentCalculations = async () => {
+    try {
+      setCalculationsLoading(true);
+      setCalculationsError(null);
+      const recentCalculations = await calculationAPI.getRecentCalculations(8); // Load 8 recent calculations
+      setCalculations(recentCalculations);
+    } catch (error: any) {
+      setCalculationsError(error.message);
+      console.error('Error loading recent calculations:', error);
+    } finally {
+      setCalculationsLoading(false);
+    }
+  };
+
   // Load data when component mounts
   useEffect(() => {
     loadRecentNotes();
+    loadRecentCalculations();
   }, []);
 
   // Navigate to notes list view (not form)
@@ -190,16 +200,54 @@ const NotesAndCalculations = () => {
 
             {/* Scrollable Calculations List */}
             <div className="h-80 overflow-y-auto divide-y divide-gray-100">
-              {sampleCalculations.map((calc) => (
+              {calculationsLoading && (
+                <div className="flex justify-center items-center h-full">
+                  <div className="flex items-center gap-3 text-gray-500">
+                    <Loader className="h-5 w-5 animate-spin" />
+                    <span>Loading calculations...</span>
+                  </div>
+                </div>
+              )}
+
+              {calculationsError && (
+                <div className="px-6 py-4 text-center">
+                  <div className="text-red-600 text-sm">{calculationsError}</div>
+                  <button
+                    onClick={loadRecentCalculations}
+                    className="mt-2 text-green-600 hover:text-green-700 text-sm font-medium"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              )}
+
+              {!calculationsLoading && !calculationsError && calculations.length === 0 && (
+                <div className="px-6 py-8 text-center">
+                  <div className="text-gray-400 mb-2">
+                    <svg className="mx-auto h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 002 2v14a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <p className="text-gray-500 text-sm mb-3">No calculations yet</p>
+                  <button
+                    onClick={handleNewCalculation}
+                    className="text-green-600 hover:text-green-700 text-sm font-medium"
+                  >
+                    Create your first calculation →
+                  </button>
+                </div>
+              )}
+
+              {!calculationsLoading && !calculationsError && calculations.map((calc) => (
                 <div
-                  key={calc.id}
+                  key={calc._id}
                   className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
                   onClick={handleViewAllCalculations}
                 >
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-medium text-gray-900 mb-1">{calc.title}</h3>
-                      <p className="text-sm text-gray-500">{calc.date}</p>
+                      <p className="text-sm text-gray-500">{formatDate(calc.date)}</p>
                     </div>
                     <div className="text-right">
                       <div className="font-semibold text-green-600">₹{calc.total.toLocaleString()}</div>
@@ -218,37 +266,6 @@ const NotesAndCalculations = () => {
                 View all calculations →
               </button>
             </div>
-          </div>
-        </div>
-
-        {/* Summary Stats */}
-        <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
-            <div className="text-3xl font-bold text-blue-600 mb-2">
-              {notesLoading ? (
-                <Loader className="h-8 w-8 animate-spin mx-auto" />
-              ) : (
-                notes.length
-              )}
-            </div>
-            <div className="text-sm text-gray-500">Total Notes</div>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
-            <div className="text-3xl font-bold text-green-600 mb-2">{sampleCalculations.length}</div>
-            <div className="text-sm text-gray-500">Total Calculations</div>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
-            <div className="text-3xl font-bold text-yellow-600 mb-2">
-              ₹{sampleCalculations.reduce((sum, calc) => sum + calc.total, 0).toLocaleString()}
-            </div>
-            <div className="text-sm text-gray-500">Total Amount</div>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
-            <div className="text-3xl font-bold text-purple-600 mb-2">Today</div>
-            <div className="text-sm text-gray-500">Last Updated</div>
           </div>
         </div>
       </div>
