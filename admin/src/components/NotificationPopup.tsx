@@ -79,8 +79,6 @@ const NotificationPopup: React.FC = () => {
 
   const fetchNotifications = async () => {
     try {
-      console.log('Fetching notifications...');
-      // ✅ Fixed: Remove extra /api prefix
       const response = await axios.get('/notifications');
       
       // শুধুমাত্র unread notifications state এ রাখা
@@ -92,7 +90,6 @@ const NotificationPopup: React.FC = () => {
         setShowPopup(true);
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error);
     }
   };
 

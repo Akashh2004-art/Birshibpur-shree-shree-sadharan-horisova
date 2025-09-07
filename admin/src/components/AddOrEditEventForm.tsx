@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import imageCompression from 'browser-image-compression';
 
 interface EventFormProps {
   event?: {
@@ -27,6 +28,7 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [dragActive, setDragActive] = useState(false);
+  const [compressing, setCompressing] = useState(false);
 
   useEffect(() => {
     if (event) {
@@ -46,27 +48,57 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleImageChange = (file: File) => {
-    // ✅ File validation
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
-      setError('ছবির সাইজ ৫MB এর কম হতে হবে');
-      return;
-    }
+  const compressImage = async (file: File): Promise<File> => {
+    const options = {
+      maxSizeMB: 4.8,
+      maxWidthOrHeight: 1920,
+      useWebWorker: true,
+      fileType: file.type,
+      initialQuality: 0.8
+    };
 
-    // ✅ File type validation
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      setError('শুধুমাত্র JPG, PNG, বা WebP ফরম্যাটের ছবি আপলোড করুন');
-      return;
+    try {
+      setCompressing(true);
+      const compressedFile = await imageCompression(file, options);
+      
+      console.log('Image Compression Result:');
+      console.log('Original file size:', (file.size / 1024 / 1024).toFixed(2), 'MB');
+      console.log('Compressed file size:', (compressedFile.size / 1024 / 1024).toFixed(2), 'MB');
+      
+      return compressedFile;
+    } catch (error) {
+      console.error('Image compression failed:', error);
+      throw new Error('Failed to compress image');
+    } finally {
+      setCompressing(false);
     }
+  };
 
-    setError(''); // Clear any previous errors
-    setFormData(prev => ({
-      ...prev,
-      imageFile: file,
-      imagePreview: URL.createObjectURL(file)
-    }));
+  const handleImageChange = async (file: File) => {
+    try {
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        setError('Please upload only JPG, PNG, or WebP format images');
+        return;
+      }
+
+      setError('');
+
+      let finalFile = file;
+      
+      if (file.size > 5 * 1024 * 1024) {
+        finalFile = await compressImage(file);
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        imageFile: finalFile,
+        imagePreview: URL.createObjectURL(finalFile)
+      }));
+
+    } catch (err: any) {
+      setError(err.message || 'Failed to process image');
+    }
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -75,7 +107,6 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
     }
   };
 
-  // Drag and drop handlers
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -101,33 +132,32 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
     setLoading(true);
     setError('');
 
-    // ✅ Validation
     if (!formData.title.trim()) {
-      setError('উৎসবের নাম লিখুন');
+      setError('Please enter event name');
       setLoading(false);
       return;
     }
 
     if (!formData.startDate || !formData.endDate) {
-      setError('শুরু এবং শেষের তারিখ দিন');
+      setError('Please provide start and end dates');
       setLoading(false);
       return;
     }
 
     if (new Date(formData.startDate) > new Date(formData.endDate)) {
-      setError('শেষের তারিখ শুরুর তারিখের পরে হতে হবে');
+      setError('End date must be after start date');
       setLoading(false);
       return;
     }
 
     if (!formData.description.trim()) {
-      setError('বর্ণনা লিখুন');
+      setError('Please enter description');
       setLoading(false);
       return;
     }
 
     if (!event && !formData.imageFile) {
-      setError('একটি ছবি আপলোড করুন');
+      setError('Please upload an image');
       setLoading(false);
       return;
     }
@@ -145,11 +175,9 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
 
       let response;
       
-      // ✅ FIXED: Use proper API endpoints
       const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       
       if (event) {
-        // Update existing event
         response = await axios.put(
           `${baseURL}/api/events/${event.id}`, 
           formDataToSend, 
@@ -161,7 +189,6 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
           }
         );
       } else {
-        // Create new event
         response = await axios.post(
           `${baseURL}/api/events`, 
           formDataToSend, 
@@ -178,7 +205,7 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
         onSave(response.data);
         onClose();
       } else {
-        setError(response.data.error || 'একটি সমস্যা হয়েছে');
+        setError(response.data.error || 'An error occurred');
       }
 
     } catch (err: any) {
@@ -187,18 +214,17 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
       if (err.response?.data?.error) {
         setError(err.response.data.error);
       } else if (err.response?.status === 401) {
-        setError('আপনার সেশন শেষ হয়ে গেছে। আবার লগইন করুন।');
+        setError('Your session has expired. Please login again.');
       } else if (err.response?.status === 413) {
-        setError('ফাইল সাইজ অনেক বড়। ছোট ছবি আপলোড করুন।');
+        setError('File size too large. Please upload a smaller image.');
       } else {
-        setError('নেটওয়ার্ক সমস্যা। আবার চেষ্টা করুন।');
+        setError('Network error. Please try again.');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Cleanup image preview URL on unmount
   useEffect(() => {
     return () => {
       if (formData.imagePreview && formData.imagePreview.startsWith('blob:')) {
@@ -235,14 +261,14 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
                 <svg className="w-4 h-4 mr-2 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                 </svg>
-                উৎসবের নাম <span className="text-red-500">*</span>
+                Event Name <span className="text-red-500">*</span>
               </label>
               <input
                 name="title"
                 value={formData.title}
                 onChange={handleChange}
                 className="w-full border-2 border-gray-200 p-4 rounded-2xl focus:ring-4 focus:ring-orange-100 focus:border-orange-400 transition-all duration-300 bg-gray-50 focus:bg-white text-lg"
-                placeholder="যেমন: কালী পূজা, দুর্গা পূজা, সরস্বতী পূজা"
+                placeholder="e.g: Kali Puja, Durga Puja, Saraswati Puja"
                 required
                 disabled={loading}
               />
@@ -255,7 +281,7 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
                   <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  শুরুর তারিখ <span className="text-red-500">*</span>
+                  Start Date <span className="text-red-500">*</span>
                 </label>
                 <input
                   name="startDate"
@@ -273,7 +299,7 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
                   <svg className="w-4 h-4 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  শেষের তারিখ <span className="text-red-500">*</span>
+                  End Date <span className="text-red-500">*</span>
                 </label>
                 <input
                   name="endDate"
@@ -283,7 +309,7 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
                   className="w-full border-2 border-gray-200 p-4 rounded-2xl focus:ring-4 focus:ring-red-100 focus:border-red-400 transition-all duration-300 bg-gray-50 focus:bg-white"
                   required
                   disabled={loading}
-                  min={formData.startDate} // Prevent end date before start date
+                  min={formData.startDate}
                 />
               </div>
             </div>
@@ -294,7 +320,7 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
                 <svg className="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" />
                 </svg>
-                বর্ণনা <span className="text-red-500">*</span>
+                Description <span className="text-red-500">*</span>
               </label>
               <textarea
                 name="description"
@@ -302,15 +328,15 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
                 onChange={handleChange}
                 className="w-full border-2 border-gray-200 p-4 rounded-2xl focus:ring-4 focus:ring-blue-100 focus:border-blue-400 transition-all duration-300 resize-none bg-gray-50 focus:bg-white"
                 rows={5}
-                placeholder="উৎসব সম্পর্কে বিস্তারিত লিখুন... যেমন: সময়, বিশেষ আকর্ষণ, অংশগ্রহণকারী ইত্যাদি"
+                placeholder="Write details about the event... e.g: timing, special attractions, participants etc."
                 required
                 disabled={loading}
                 maxLength={500}
               />
               <div className="flex justify-between items-center text-xs">
-                <span className="text-gray-500">উৎসবের সম্পূর্ণ বিবরণ দিন</span>
+                <span className="text-gray-500">Provide complete event details</span>
                 <span className={`font-medium ${formData.description.length > 450 ? 'text-red-500' : 'text-gray-500'}`}>
-                  {formData.description.length}/500 অক্ষর
+                  {formData.description.length}/500 characters
                 </span>
               </div>
             </div>
@@ -323,8 +349,18 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
                 <svg className="w-4 h-4 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                ছবি {!event && <span className="text-red-500">*</span>}
+                Image {!event && <span className="text-red-500">*</span>}
               </label>
+              
+              {/* Compression Status */}
+              {compressing && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
+                    <span className="text-blue-800 font-medium">Compressing image...</span>
+                  </div>
+                </div>
+              )}
               
               {/* Drag and Drop Area */}
               <div
@@ -332,7 +368,7 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
                   dragActive
                     ? 'border-purple-400 bg-purple-50'
                     : 'border-gray-300 hover:border-purple-300 hover:bg-gray-50'
-                }`}
+                } ${compressing ? 'pointer-events-none opacity-50' : ''}`}
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}
                 onDragOver={handleDrag}
@@ -344,7 +380,7 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
                   onChange={handleFileInput}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   required={!event}
-                  disabled={loading}
+                  disabled={loading || compressing}
                 />
                 
                 <div className="space-y-4">
@@ -356,19 +392,19 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
                   
                   <div>
                     <p className="text-lg font-medium text-gray-700">
-                      ছবি আপলোড করুন
+                      Upload Image
                     </p>
                     <p className="text-sm text-gray-500 mt-1">
-                      ড্র্যাগ করে ছেড়ে দিন অথবা ক্লিক করুন
+                      Drag and drop or click to select
                     </p>
                   </div>
                   
                   <div className="bg-gray-100 rounded-xl p-3 inline-block">
                     <p className="text-xs text-gray-600">
-                      <span className="font-medium">সমর্থিত ফরম্যাট:</span> JPG, PNG, WebP
+                      <span className="font-medium">Supported formats:</span> JPG, PNG, WebP
                     </p>
-                    <p className="text-xs text-gray-600">
-                      <span className="font-medium">সর্বোচ্চ সাইজ:</span> ৫MB
+                    <p className="text-xs text-green-600 font-medium">
+                      Any size image! Auto-compress feature
                     </p>
                   </div>
                 </div>
@@ -383,7 +419,12 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
-                  ছবির প্রিভিউ
+                  Image Preview
+                  {formData.imageFile && (
+                    <span className="ml-2 bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
+                      {(formData.imageFile.size / 1024 / 1024).toFixed(2)} MB
+                    </span>
+                  )}
                 </p>
                 
                 <div className="relative group">
@@ -394,7 +435,7 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"></div>
                   <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-gray-800 text-sm px-3 py-1 rounded-full font-medium">
-                    প্রিভিউ
+                    Preview
                   </div>
                 </div>
               </div>
@@ -408,22 +449,24 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
             type="button"
             onClick={onClose}
             className="w-full sm:w-auto px-8 py-4 border-2 border-gray-300 rounded-2xl text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 disabled:opacity-50"
-            disabled={loading}
+            disabled={loading || compressing}
           >
-            বাতিল
+            Cancel
           </button>
           
           <button
             type="submit"
             className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl hover:from-orange-600 hover:to-red-600 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:scale-105"
-            disabled={loading}
+            disabled={loading || compressing}
           >
-            {loading && (
+            {(loading || compressing) && (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
             )}
             
-            {loading ? (
-              'অপেক্ষা করুন...'
+            {compressing ? (
+              'Preparing image...'
+            ) : loading ? (
+              'Please wait...'
             ) : (
               <>
                 {event ? (
@@ -431,14 +474,14 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
-                    আপডেট করুন
+                    Update
                   </>
                 ) : (
                   <>
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
-                    তৈরি করুন
+                    Create
                   </>
                 )}
               </>
@@ -447,7 +490,7 @@ const AddOrEditEventForm: React.FC<EventFormProps> = ({ event, onClose, onSave }
         </div>
       </form>
 
-      <style >{`
+      <style>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
           25% { transform: translateX(-5px); }

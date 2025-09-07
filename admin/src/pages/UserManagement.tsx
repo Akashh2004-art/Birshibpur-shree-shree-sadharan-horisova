@@ -9,6 +9,8 @@ interface User {
   phone: string;
   status: 'active' | 'inactive';
   createdAt: Date;
+  photoURL?: string; // ✅ Photo URL field added
+  authProvider?: 'email' | 'phone' | 'google'; // ✅ Auth provider for context
 }
 
 const UserManagement: React.FC = () => {
@@ -19,12 +21,8 @@ const UserManagement: React.FC = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        console.log('🔍 Fetching users...');
-        
         // FIXED: Updated endpoint path after app.ts routes change
         const response = await api.get('/user-auth/get-users'); // Changed from /auth/get-users
-        
-        console.log('✅ Users fetched successfully:', response.data);
         
         // Check if response has the expected structure
         if (Array.isArray(response.data)) {
@@ -43,13 +41,13 @@ const UserManagement: React.FC = () => {
         console.error('❌ Error fetching users:', error);
         
         if (error.response?.status === 403) {
-          setError('অ্যাডমিন অ্যাক্সেস প্রয়োজন');
+          setError('Admin access is required');
         } else if (error.response?.status === 401) {
-          setError('অনুমোদন প্রয়োজন - লগইন করুন');
+          setError('Authorization required - login');
         } else if (error.response?.status === 404) {
-          setError('ইউজার ডেটা API পাওয়া যায়নি');
+          setError('Authorization required - LoginUser Data API not found');
         } else {
-          const errorMsg = error.response?.data?.message || 'সার্ভার থেকে ডেটা লোড করতে সমস্যা হয়েছে';
+          const errorMsg = error.response?.data?.message || 'There was a problem loading data from the server.';
           setError(errorMsg);
         }
       } finally {
@@ -59,6 +57,106 @@ const UserManagement: React.FC = () => {
 
     fetchUsers();
   }, []);
+
+  // ✅ User avatar component with fallback
+  const UserAvatar = ({ user }: { user: User }) => {
+    const [imageError, setImageError] = useState(false);
+    
+    // Generate initials for fallback
+    const getInitials = (name?: string, email?: string) => {
+      if (name) {
+        return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      }
+      if (email) {
+        return email[0].toUpperCase();
+      }
+      return 'U';
+    };
+
+    const handleImageError = () => {
+      setImageError(true);
+    };
+
+    // If has photoURL and no error, show image
+    if (user.photoURL && !imageError) {
+      return (
+        <img
+          src={user.photoURL}
+          alt={user.name || user.email || 'User'}
+          className="h-10 w-10 rounded-full object-cover ring-2 ring-white shadow-sm"
+          onError={handleImageError}
+        />
+      );
+    }
+
+    // Fallback to initials with gradient
+    return (
+      <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center ring-2 ring-white shadow-sm">
+        <span className="text-white font-semibold text-sm">
+          {getInitials(user.name, user.email)}
+        </span>
+      </div>
+    );
+  };
+
+  // ✅ Mobile user avatar (larger)
+  const MobileUserAvatar = ({ user }: { user: User }) => {
+    const [imageError, setImageError] = useState(false);
+    
+    const getInitials = (name?: string, email?: string) => {
+      if (name) {
+        return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      }
+      if (email) {
+        return email[0].toUpperCase();
+      }
+      return 'U';
+    };
+
+    const handleImageError = () => {
+      setImageError(true);
+    };
+
+    if (user.photoURL && !imageError) {
+      return (
+        <img
+          src={user.photoURL}
+          alt={user.name || user.email || 'User'}
+          className="h-12 w-12 rounded-full object-cover ring-2 ring-white shadow-lg"
+          onError={handleImageError}
+        />
+      );
+    }
+
+    return (
+      <div className="h-12 w-12 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center ring-2 ring-white shadow-lg">
+        <span className="text-white font-semibold text-base">
+          {getInitials(user.name, user.email)}
+        </span>
+      </div>
+    );
+  };
+
+  // ✅ Provider badge component
+  const ProviderBadge = ({ provider }: { provider?: string }) => {
+    if (!provider) return null;
+
+    const badges = {
+      google: { icon: '🔍', color: 'bg-red-100 text-red-800', text: 'Google' },
+      phone: { icon: '📱', color: 'bg-green-100 text-green-800', text: 'Phone' },
+      email: { icon: '📧', color: 'bg-blue-100 text-blue-800', text: 'Email' }
+    };
+
+    const badge = badges[provider as keyof typeof badges];
+    if (!badge) return null;
+
+    return (
+      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${badge.color}`}>
+        <span className="mr-1">{badge.icon}</span>
+        {badge.text}
+      </span>
+    );
+  };
 
   if (loading) {
     return (
@@ -125,6 +223,9 @@ const UserManagement: React.FC = () => {
                     Phone
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Provider
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Joined Date
                   </th>
                 </tr>
@@ -132,9 +233,9 @@ const UserManagement: React.FC = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {users.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
                       <UserIcon className="h-12 w-12 mx-auto text-gray-300 mb-2" />
-                      <p>কোনো ইউজার পাওয়া যায়নি</p>
+                      <p>No users found.</p>
                     </td>
                   </tr>
                 ) : (
@@ -142,21 +243,22 @@ const UserManagement: React.FC = () => {
                     <tr key={user._id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center">
-                            <UserIcon className="h-6 w-6 text-white" />
-                          </div>
+                          <UserAvatar user={user} />
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">
-                              {user.name || 'নাম নেই'}
+                              {user.name || 'No name'}
                             </div>
                             <div className="text-sm text-gray-500">
-                              {user.email || 'ইমেইল নেই'}
+                              {user.email || 'No email'}
                             </div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {user.phone || 'ফোন নেই'}
+                        {user.phone || 'No phone'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <ProviderBadge provider={user.authProvider} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(user.createdAt).toLocaleDateString('en-US')}
@@ -174,22 +276,23 @@ const UserManagement: React.FC = () => {
           {users.length === 0 ? (
             <div className="text-center py-8">
               <UserIcon className="h-12 w-12 mx-auto text-gray-300 mb-2" />
-              <p className="text-gray-500">কোনো ইউজার পাওয়া যায়নি</p>
+              <p className="text-gray-500">No users found.</p>
             </div>
           ) : (
             users.map((user, index) => (
               <div key={user._id}>
                 <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
                   <div className="flex items-center space-x-3">
-                    <div className="h-12 w-12 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center">
-                      <UserIcon className="h-6 w-6 text-white" />
-                    </div>
+                    <MobileUserAvatar user={user} />
                     <div className="flex-1">
-                      <h3 className="text-base font-semibold text-gray-900">
-                        {user.name || 'নাম নেই'}
-                      </h3>
-                      <p className="text-sm text-gray-500">{user.email || 'ইমেইল নেই'}</p>
-                      <p className="text-sm text-gray-700">📞 {user.phone || 'ফোন নেই'}</p>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-base font-semibold text-gray-900">
+                          {user.name || 'নাম নেই'}
+                        </h3>
+                        <ProviderBadge provider={user.authProvider} />
+                      </div>
+                      <p className="text-sm text-gray-500">{user.email || 'No Email'}</p>
+                      <p className="text-sm text-gray-700">📞 {user.phone || 'No Phone'}</p>
                       <div className="flex items-center justify-between mt-2">
                         <p className="text-sm text-gray-500">
                           📅 {new Date(user.createdAt).toLocaleDateString('en-US')}

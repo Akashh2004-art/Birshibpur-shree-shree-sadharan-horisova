@@ -75,7 +75,8 @@ function AppContent() {
     <div className="min-h-screen flex flex-col bg-gray-50">
       {user && <Navbar />}
 
-      <div className="flex-1 p-4 container mx-auto">
+      {/* 🔥 FIXED: Remove container mx-auto, add full width */}
+      <div className="flex-1 w-full">
         <Routes>
           {/* Public Routes */}
           <Route
@@ -173,7 +174,7 @@ function AppContent() {
       </div>
 
       <footer className="text-center py-4 text-gray-600 bg-gray-100">
-        <p>🕉️ জয় শ্রী রাম - {new Date().getFullYear()}</p>
+        <p>°•👁U👁•°</p>
       </footer>
     </div>
   );
