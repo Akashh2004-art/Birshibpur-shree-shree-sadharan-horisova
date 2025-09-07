@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { getEventsForHome, getPastEvents } from '../utils/api'; // ✅ ADDED: getPastEvents
+import { getEventsForHome, getPastEvents } from '../utils/api'; 
 
-// Event interface to match backend
+
 interface Event {
   _id: string;
   title: string;
@@ -10,22 +10,21 @@ interface Event {
   description: string;
   imageUrl: string;
   imagePublicId: string;
-  status?: string; // ✅ ADDED: status field
+  status?: string; 
   createdAt: string;
   updatedAt: string;
 }
 
 const Events = () => {
   const [events, setEvents] = useState<Event[]>([]);
-  // ✅ NEW: Separate state for past events
   const [pastEvents, setPastEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [pastLoading, setPastLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch events for home (only আসন্ন and অনুষ্ঠান চলছে)
+  // Fetch events for home 
   useEffect(() => {
-    window.scrollTo(0, 0); // 🔼 scroll to top
+    window.scrollTo(0, 0); 
 
     const fetchActiveEvents = async () => {
       try {
@@ -34,17 +33,17 @@ const Events = () => {
         if (response.success) {
           setEvents(response.data);
         } else {
-          setError('ইভেন্ট লোড করতে সমস্যা হয়েছে');
+          setError('There was a problem loading the event');
         }
       } catch (err) {
         console.error('Events fetch error:', err);
-        setError('ইভেন্ট লোড করতে সমস্যা হয়েছে');
+        setError('There was a problem loading the event');
       } finally {
         setLoading(false);
       }
     };
 
-    // ✅ NEW: Fetch past events separately
+
     const fetchPastEvents = async () => {
       try {
         setPastLoading(true);
@@ -78,7 +77,6 @@ const Events = () => {
     });
   };
 
-  // ✅ SIMPLIFIED: Use status from backend instead of calculating again
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'আসন্ন':
@@ -156,7 +154,7 @@ const Events = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <p className="text-lg font-medium">কোনো সক্রিয় ইভেন্ট পাওয়া যায়নি</p>
+              <p className="text-lg font-medium">No active events found</p>
             </div>
           </div>
         ) : (
@@ -166,7 +164,7 @@ const Events = () => {
               <div className="text-center mb-12">
                 <h2 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">বর্তমান ও আসন্ন অনুষ্ঠানসমূহ</h2>
                 <div className="w-32 h-1 bg-gradient-to-r from-orange-400 to-red-400 mx-auto rounded-full"></div>
-                <p className="text-gray-600 mt-4 text-lg">আমাদের আসন্ন পবিত্র অনুষ্ঠানসমূহ</p>
+                <p className="text-gray-600 mt-4 text-lg">আমাদের আসন্ন অনুষ্ঠান</p>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -290,7 +288,7 @@ const Events = () => {
               <div className="text-center mb-12">
                 <h2 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">ইতিহাসের অনুষ্ঠানসমূহ</h2>
                 <div className="w-32 h-1 bg-gradient-to-r from-gray-400 to-gray-600 mx-auto rounded-full"></div>
-                <p className="text-gray-600 mt-4 text-lg">আমাদের সম্পন্ন হওয়া পবিত্র অনুষ্ঠানসমূহ</p>
+                <p className="text-gray-600 mt-4 text-lg">আমাদের সম্পন্ন হওয়া অনুষ্ঠান</p>
               </div>
               
               {pastLoading ? (
@@ -299,7 +297,7 @@ const Events = () => {
                     <div className="animate-spin rounded-full h-12 w-12 border-b-3 border-gray-500"></div>
                     <div className="absolute inset-0 animate-ping rounded-full h-12 w-12 border-2 border-gray-300 opacity-50"></div>
                   </div>
-                  <span className="ml-3 text-gray-600 font-medium">ইতিহাস লোড করা হচ্ছে...</span>
+                  <span className="ml-3 text-gray-600 font-medium">Loading history...</span>
                 </div>
               ) : pastEvents.length === 0 ? (
                 <div className="text-center py-12">
@@ -309,7 +307,7 @@ const Events = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
-                    <p className="text-lg font-medium">কোনো পূর্ববর্তী অনুষ্ঠান পাওয়া যায়নি</p>
+                    <p className="text-lg font-medium">No previous events found</p>
                   </div>
                 </div>
               ) : (

@@ -161,8 +161,8 @@ const Gallery = () => {
               <div className="w-32 h-32 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-8">
                 <span className="text-5xl">🖼️</span>
               </div>
-              <h3 className="text-2xl font-bold text-gray-600 mb-4">এই ক্যাটাগরিতে কোন আইটেম নেই</h3>
-              <p className="text-gray-500 text-lg">শীঘ্রই নতুন মিডিয়া যোগ করা হবে</p>
+              <h3 className="text-2xl font-bold text-gray-600 mb-4">There are no items in this category</h3>
+              <p className="text-gray-500 text-lg">New media will be added soon</p>
             </div>
           </div>
         ) : (
@@ -320,13 +320,6 @@ const Gallery = () => {
                     </div>
                   </div>
                 </div>
-                {selectedItem.uploadedBy && (
-                  <div className="mt-4 bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                    <p className="text-sm text-gray-300">
-                      <span className="font-semibold">আপলোড করেছেন:</span> {selectedItem.uploadedBy.name}
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
           </div>

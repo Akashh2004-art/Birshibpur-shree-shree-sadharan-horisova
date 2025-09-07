@@ -3,7 +3,7 @@ import {
   googleSignIn, 
   setPassword, 
   login,
-  getAdminProfile // Now this will be properly imported
+  getAdminProfile
 } from '../controllers/authController';
 import { 
   verifyFirebaseToken, 

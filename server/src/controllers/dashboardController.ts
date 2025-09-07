@@ -3,7 +3,6 @@ import User from '../models/userModel';
 
 export const getDashboardStats = async (req: Request, res: Response) => {
   try {
-    // ইউজার স্ট্যাটিসটিক্স
     const totalUsers = await User.countDocuments();
     const lastMonthDate = new Date();
     lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
@@ -33,10 +32,9 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
-    console.error('ড্যাশবোর্ড স্ট্যাট লোড করতে সমস্যা হয়েছে:', error);
     res.status(500).json({
       success: false,
-      message: 'ড্যাশবোর্ড স্ট্যাটিসটিক্স লোড করতে সমস্যা হয়েছে'
+      message: 'There was a problem loading dashboard statistics'
     });
   }
 };

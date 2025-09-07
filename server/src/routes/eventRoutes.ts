@@ -10,7 +10,7 @@ import {
   getUpcomingEvents,
   getPastEvents,
   getEventCount,
-  getEventsForHome // ✅ Import the new function
+  getEventsForHome 
 } from '../controllers/eventController';
 
 const router = express.Router();
@@ -36,8 +36,6 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
-// ✅ IMPORTANT: Specific routes MUST come BEFORE parameterized routes
-// ✅ Get events for Home page with status (MOVED TO TOP)
 router.get('/home', getEventsForHome);
 
 // ✅ Get upcoming events (MOVED TO TOP)

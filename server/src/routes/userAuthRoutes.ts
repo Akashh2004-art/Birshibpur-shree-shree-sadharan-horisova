@@ -8,9 +8,9 @@ import {
   checkPhoneNumber, 
   login,
   logout,
-  getAllUsers // নতুন কন্ট্রোলার ইমপোর্ট
+  getAllUsers 
 } from '../controllers/userAuthController';
-import { authenticateAdmin } from '../middleware/authMiddleware'; // অ্যাডমিন অথেন্টিকেশন
+import { authenticateAdmin } from '../middleware/authMiddleware'; 
 
 const router = express.Router();
 
@@ -32,6 +32,6 @@ router.post('/complete-signup', completeSignup);
 router.post('/logout', logout);
 
 // 🔹 Admin Only Route for Getting All Users
-router.get('/get-users', authenticateAdmin, getAllUsers); // শুধুমাত্র অ্যাডমিন পাওয়া যাবে
+router.get('/get-users', authenticateAdmin, getAllUsers); 
 
 export default router;

@@ -8,7 +8,7 @@ import {
   getGalleryStats,
   upload,
 } from '../controllers/galleryController';
-import { authenticateAdmin } from '../middleware/authMiddleware'; // ✅ use correct named import
+import { authenticateAdmin } from '../middleware/authMiddleware'; 
 
 const router = Router();
 

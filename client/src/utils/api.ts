@@ -109,10 +109,10 @@ export const setNewPassword = (
     "Content-Type": "application/json",
   };
 
-  // Check if this should also be /user-auth instead of /user
+  // ✅ FIXED: Use 'emailOrPhone' instead of 'email'
   return request("/user/set-password", {
     data: {
-      email: emailOrPhone,
+      emailOrPhone,  // ✅ Changed from 'email' to 'emailOrPhone'
       otp,
       password,
     },

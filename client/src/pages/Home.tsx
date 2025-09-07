@@ -220,7 +220,7 @@ const Home = () => {
           ) : events.length === 0 ? (
             <div className="text-center py-16">
               <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded max-w-md mx-auto">
-                <p>কোনো আসন্ন ইভেন্ট নেই</p>
+                <p>There are no upcoming events</p>
               </div>
             </div>
           ) : (
