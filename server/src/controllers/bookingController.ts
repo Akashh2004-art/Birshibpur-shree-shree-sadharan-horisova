@@ -471,24 +471,71 @@ export const getCurrentBookingStatus = async (req: Request, res: Response) => {
       });
     }
 
-    // Find user's active booking (pending or approved)
-    const activeBooking = await Booking.findOne({
-      userId,
-      status: { $in: ['pending', 'approved'] }
+    // Find user's latest booking (including rejected ones)
+    const latestBooking = await Booking.findOne({
+      userId
     }).sort({ createdAt: -1 });
 
-    if (!activeBooking) {
+    if (!latestBooking) {
       return res.json({
         success: true,
         data: null,
-        message: 'No active booking found'
+        message: 'No booking found'
       });
     }
 
-    // Check if approved booking has expired
-    if (activeBooking.status === 'approved') {
-      const bookingDateTime = new Date(activeBooking.date);
-      const [timeStr] = activeBooking.time.split(' ');
+    // Handle rejected bookings - show for 24 hours then hide
+    if (latestBooking.status === 'rejected') {
+      const rejectedAt = latestBooking.updatedAt || latestBooking.createdAt;
+      const twentyFourHoursAgo = new Date();
+      twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+
+      // If rejected more than 24 hours ago, don't show it
+      if (rejectedAt < twentyFourHoursAgo) {
+        return res.json({
+          success: true,
+          data: null,
+          message: 'No active booking found'
+        });
+      }
+
+      // Show recent rejection
+      return res.json({
+        success: true,
+        data: {
+          expired: false,
+          bookingId: latestBooking._id.toString(),
+          serviceName: latestBooking.serviceName,
+          date: latestBooking.date.toISOString(),
+          time: latestBooking.time,
+          status: latestBooking.status,
+          rejectionReason: latestBooking.rejectionReason,
+          message: latestBooking.message
+        }
+      });
+    }
+
+    // Handle pending bookings - always show
+    if (latestBooking.status === 'pending') {
+      return res.json({
+        success: true,
+        data: {
+          expired: false,
+          bookingId: latestBooking._id.toString(),
+          serviceName: latestBooking.serviceName,
+          date: latestBooking.date.toISOString(),
+          time: latestBooking.time,
+          status: latestBooking.status,
+          rejectionReason: latestBooking.rejectionReason,
+          message: latestBooking.message
+        }
+      });
+    }
+
+    // Handle approved bookings - check if expired
+    if (latestBooking.status === 'approved') {
+      const bookingDateTime = new Date(latestBooking.date);
+      const [timeStr] = latestBooking.time.split(' ');
       const [hour, minute] = timeStr.split(':').map(Number);
 
       bookingDateTime.setHours(hour, minute + 5, 0, 0); // Add 5 min grace period
@@ -500,32 +547,39 @@ export const getCurrentBookingStatus = async (req: Request, res: Response) => {
           success: true,
           data: {
             expired: true,
-            bookingId: activeBooking._id.toString(),
-            serviceName: activeBooking.serviceName,
-            date: activeBooking.date.toISOString(),
-            time: activeBooking.time,
-            status: activeBooking.status, // still shows approved
-            rejectionReason: activeBooking.rejectionReason,
-            message: activeBooking.message
+            bookingId: latestBooking._id.toString(),
+            serviceName: latestBooking.serviceName,
+            date: latestBooking.date.toISOString(),
+            time: latestBooking.time,
+            status: latestBooking.status,
+            rejectionReason: latestBooking.rejectionReason,
+            message: latestBooking.message
           },
           message: 'Booking is expired'
         });
       }
+
+      // Show active approved booking
+      return res.json({
+        success: true,
+        data: {
+          expired: false,
+          bookingId: latestBooking._id.toString(),
+          serviceName: latestBooking.serviceName,
+          date: latestBooking.date.toISOString(),
+          time: latestBooking.time,
+          status: latestBooking.status,
+          rejectionReason: latestBooking.rejectionReason,
+          message: latestBooking.message
+        }
+      });
     }
 
-    // Return active booking (not expired)
-    res.json({
+    // Fallback - should not reach here
+    return res.json({
       success: true,
-      data: {
-        expired: false,
-        bookingId: activeBooking._id.toString(),
-        serviceName: activeBooking.serviceName,
-        date: activeBooking.date.toISOString(),
-        time: activeBooking.time,
-        status: activeBooking.status,
-        rejectionReason: activeBooking.rejectionReason,
-        message: activeBooking.message
-      }
+      data: null,
+      message: 'No active booking found'
     });
 
   } catch (error) {
